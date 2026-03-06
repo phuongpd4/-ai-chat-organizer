@@ -14,6 +14,7 @@ export default function SidebarContainer() {
     const [assigningChatId, setAssigningChatId] = useState<string | null>(null);
     const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
     const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+    const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
     const editInputRef = useRef<HTMLInputElement>(null);
 
     const nativeChats = useDOMObserver();
@@ -23,7 +24,6 @@ export default function SidebarContainer() {
         getStorageData().then(setAppState);
         getSavedTheme().then(setThemeMode);
 
-        // Lắng nghe thay đổi theme & storage
         const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
             if (areaName === 'sync' && changes.themeMode) {
                 setThemeMode(changes.themeMode.newValue === 'light' ? 'light' : 'dark');
@@ -40,14 +40,12 @@ export default function SidebarContainer() {
         }
     }, [editingFolderId]);
 
-    // ── Theme Toggle ────────────────────────────────
     const handleThemeToggle = () => {
         const next: ThemeMode = themeMode === 'dark' ? 'light' : 'dark';
         setThemeMode(next);
         saveTheme(next);
     };
 
-    // ── Folder Actions ──────────────────────────────
     const handleCreateFolder = () => {
         if (!appState) return;
         const newFolder: Folder = { id: `folder_${Date.now()}`, name: 'New Folder', color: '#3b82f6', createdAt: Date.now() };
@@ -69,10 +67,13 @@ export default function SidebarContainer() {
 
     const handleDeleteFolder = (folderId: string) => {
         if (!appState) return;
-        const updated = appState.folders.filter(f => f.id !== folderId);
+        // Lấy tất cả thư mục con (recursive delete optional, here we just delete current and unassign child chats)
+        // Để đơn giản (MVP), ta xoá thư mục đó, các sub-folder sẽ bị mồ côi (trở thành list ngoài cùng), các đoạn chat bên trong thư mục bị gỡ khỏi thư mục.
+        const updatedFolders = appState.folders.filter(f => f.id !== folderId).map(f => f.parentId === folderId ? { ...f, parentId: undefined } : f);
         const updatedChats = appState.chats.map(c => c.folderId === folderId ? { ...c, folderId: undefined } : c);
-        setAppState({ ...appState, folders: updated, chats: updatedChats });
-        saveFolders(updated);
+
+        setAppState({ ...appState, folders: updatedFolders, chats: updatedChats });
+        saveFolders(updatedFolders);
         saveChats(updatedChats);
         setFolderMenuId(null);
     };
@@ -81,7 +82,6 @@ export default function SidebarContainer() {
         setExpandedFolders(prev => { const n = new Set(prev); n.has(folderId) ? n.delete(folderId) : n.add(folderId); return n; });
     };
 
-    // ── Chat Actions (Assign / Pin) ─────────────────
     const handleAssignToFolder = (chatId: string, folderId: string | undefined) => {
         if (!appState) return;
         let updatedChats = [...appState.chats];
@@ -96,6 +96,31 @@ export default function SidebarContainer() {
         saveChats(updatedChats);
         setAssigningChatId(null);
         if (folderId) setExpandedFolders(prev => new Set([...prev, folderId]));
+    };
+
+    const handleAssignFolderToFolder = (sourceFolderId: string, targetFolderId: string | undefined) => {
+        if (!appState) return;
+        if (sourceFolderId === targetFolderId) return;
+
+        // Check circular dependency
+        let isCircular = false;
+        let currentTarget = targetFolderId;
+        while (currentTarget) {
+            if (currentTarget === sourceFolderId) {
+                isCircular = true;
+                break;
+            }
+            const parent = appState.folders.find(f => f.id === currentTarget)?.parentId;
+            if (!parent) break;
+            currentTarget = parent;
+        }
+
+        if (isCircular) return; // Prevent infinite loop
+
+        const updated = appState.folders.map(f => f.id === sourceFolderId ? { ...f, parentId: targetFolderId } : f);
+        setAppState({ ...appState, folders: updated });
+        saveFolders(updated);
+        if (targetFolderId) setExpandedFolders(prev => new Set([...prev, targetFolderId]));
     };
 
     const handleTogglePin = (chatId: string) => {
@@ -126,7 +151,6 @@ export default function SidebarContainer() {
 
     if (!appState) return null;
 
-    // ── Data ────────────────────────────────────────
     const platform = (() => {
         const h = window.location.hostname;
         if (h.includes('chatgpt.com')) return 'chatgpt' as const;
@@ -149,10 +173,140 @@ export default function SidebarContainer() {
         else unassignedChats.push(ch);
     }
 
-    // Sort unassigned and search results
     const displayChats = sortChats(searchResults || unassignedChats);
 
-    // ── Render ───────────────────────────────────────
+    // Xây dựng cây folder
+    const renderFolderNode = (folder: Folder, depth: number = 0) => {
+        const exp = expandedFolders.has(folder.id);
+        const fChats = sortChats(chatsInFolders.get(folder.id) || []);
+        const childFolders = appState.folders.filter(f => f.parentId === folder.id);
+
+        const editing = editingFolderId === folder.id;
+        const menu = folderMenuId === folder.id;
+        const isDragOver = dragOverFolderId === folder.id;
+
+        return (
+            <div key={folder.id} style={{ marginLeft: depth > 0 ? '12px' : '0' }}>
+                <div
+                    draggable={!editing}
+                    onDragStart={(e) => {
+                        if (!editing) {
+                            e.dataTransfer.setData('application/folder-id', folder.id);
+                        }
+                    }}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverFolderId(folder.id); }}
+                    onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverFolderId(null); }}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDragOverFolderId(null);
+
+                        // Thả Chat
+                        const chatId = e.dataTransfer.getData('application/chat-id');
+                        if (chatId) {
+                            handleAssignToFolder(chatId, folder.id);
+                            return;
+                        }
+
+                        // Thả Folder khác vào Folder này
+                        const sourceFolderId = e.dataTransfer.getData('application/folder-id');
+                        if (sourceFolderId && sourceFolderId !== folder.id) {
+                            handleAssignFolderToFolder(sourceFolderId, folder.id);
+                        }
+                    }}
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px', padding: '6px 8px', cursor: editing ? 'text' : 'grab', position: 'relative', transition: 'all 0.15s',
+                        background: isDragOver ? 'rgba(34, 197, 94, 0.15)' : 'transparent', // Light green tint
+                        border: isDragOver ? `1px dashed #22c55e` : '1px solid transparent', // Green dashboard
+                    }}
+                    onMouseEnter={e => { if (!isDragOver) e.currentTarget.style.background = t.bgHover; }}
+                    onMouseLeave={e => { if (!isDragOver) e.currentTarget.style.background = 'transparent'; }}
+                >
+                    <span onClick={() => toggleFolderExpand(folder.id)} style={{ display: 'flex', color: t.textMuted, cursor: 'pointer', width: 14, justifyContent: 'center' }}>
+                        {(exp || childFolders.length > 0 || fChats.length > 0) ? (exp ? <ChevronDown size={12} /> : <ChevronRight size={12} />) : null}
+                    </span>
+                    <FolderIcon size={14} style={{ color: folder.color || '#60a5fa', flexShrink: 0 }} />
+
+                    {editing ? (
+                        <input ref={editInputRef} value={editingName}
+                            onChange={e => setEditingName(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') { setEditingFolderId(null); setEditingName(''); } }}
+                            onBlur={() => handleRenameFolder(folder.id)}
+                            style={{ flex: 1, fontSize: '13px', background: t.bgInput, border: `1px solid ${t.borderFocus}`, borderRadius: '4px', padding: '2px 6px', color: t.textHeading, outline: 'none', minWidth: 0 }}
+                        />
+                    ) : (
+                        <div onClick={() => toggleFolderExpand(folder.id)} style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                            <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: t.text }}>{folder.name}</span>
+                            <span style={{ fontSize: '9px', color: t.textMuted, marginTop: '1px' }}>Created {formatDate(folder.createdAt)}</span>
+                        </div>
+                    )}
+
+                    {fChats.length > 0 && !editing && (<span style={{ fontSize: '10px', color: t.textMuted, background: t.badge, borderRadius: '8px', padding: '0 5px' }}>{fChats.length}</span>)}
+                    {!editing && (
+                        <button onClick={e => { e.stopPropagation(); setFolderMenuId(menu ? null : folder.id); }}
+                            style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: 0.6 }}
+                            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                            onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
+                        ><MoreVertical size={13} /></button>
+                    )}
+
+                    {menu && (
+                        <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: t.dropdown, border: `1px solid ${t.dropdownBorder}`, borderRadius: '6px', padding: '4px', minWidth: '120px', boxShadow: `0 4px 12px ${t.shadow}` }}>
+                            <button onClick={() => { setEditingFolderId(folder.id); setEditingName(folder.name); setFolderMenuId(null); }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.text, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = t.dropdownHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            ><Pencil size={12} /> Rename</button>
+                            <button onClick={() => handleDeleteFolder(folder.id)}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.danger, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = t.dropdownHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            ><Trash2 size={12} /> Delete</button>
+                        </div>
+                    )}
+                </div>
+
+                {exp && (
+                    <div style={{ marginLeft: '12px', borderLeft: `1px solid ${t.border}`, paddingLeft: '8px' }}>
+                        {/* Recursive Render Children Folders */}
+                        {childFolders.map(cf => renderFolderNode(cf, depth + 1))}
+
+                        {/* File Chats */}
+                        {fChats.length === 0 && childFolders.length === 0 ? (
+                            <div
+                                style={{ fontSize: '11px', color: t.textMuted, padding: '12px 8px', textAlign: 'center', border: `1px dashed ${t.border}`, margin: '4px 0', borderRadius: '4px' }}
+                            >
+                                Drop chats or folders here
+                            </div>
+                        ) : fChats.map(chat => (
+                            <div key={chat.id}
+                                draggable
+                                onDragStart={(e) => { e.dataTransfer.setData('application/chat-id', chat.id); }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px', padding: '2px 4px', transition: 'background 0.15s', cursor: 'grab' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = t.bgHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                                <a href={chat.url} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, textDecoration: 'none', color: t.text, overflow: 'hidden', padding: '4px 2px' }}>
+                                    <MessageSquare size={11} style={{ color: t.textMuted, flexShrink: 0 }} />
+                                    <span style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{chat.title}</span>
+                                </a>
+                                {/* Pin Button */}
+                                <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleTogglePin(chat.id); }} title={chat.isPinned ? "Unpin chat" : "Pin chat"}
+                                    style={{ background: 'none', border: 'none', color: chat.isPinned ? t.accent : t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: chat.isPinned ? 1 : 0.3 }}
+                                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = chat.isPinned ? '1' : '0.3')}
+                                ><Pin size={11} fill={chat.isPinned ? t.accent : 'none'} /></button>
+
+                                {/* Remove from Folder Button */}
+                                <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleAssignToFolder(chat.id, undefined); }} title="Remove from folder"
+                                    style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: 0.3 }}
+                                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.3')}
+                                ><X size={11} /></button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '288px', background: t.bg, color: t.text, borderRight: `1px solid ${t.border}`, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
             {/* Header */}
@@ -179,7 +333,7 @@ export default function SidebarContainer() {
 
             {/* Main Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-                {/* Folders */}
+                {/* Folders List */}
                 {!searchResults && (
                     <div style={{ marginBottom: '20px' }}>
                         <div style={{ marginBottom: '8px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: t.textMuted }}>
@@ -189,98 +343,30 @@ export default function SidebarContainer() {
                             <div style={{ fontSize: '12px', color: t.textMuted, padding: '8px', textAlign: 'center', border: `1px dashed ${t.border}`, borderRadius: '6px' }}>Click + to create folder</div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                {appState.folders.map(folder => {
-                                    const exp = expandedFolders.has(folder.id);
-                                    const fChats = sortChats(chatsInFolders.get(folder.id) || []);
-                                    const editing = editingFolderId === folder.id;
-                                    const menu = folderMenuId === folder.id;
-
-                                    return (
-                                        <div key={folder.id}>
-                                            <div
-                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px', padding: '6px 8px', cursor: 'pointer', position: 'relative', transition: 'background 0.15s' }}
-                                                onMouseEnter={e => (e.currentTarget.style.background = t.bgHover)}
-                                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                            >
-                                                <span onClick={() => toggleFolderExpand(folder.id)} style={{ display: 'flex', color: t.textMuted }}>
-                                                    {exp ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                                </span>
-                                                <FolderIcon size={14} style={{ color: folder.color || '#60a5fa', flexShrink: 0 }} />
-
-                                                {editing ? (
-                                                    <input ref={editInputRef} value={editingName}
-                                                        onChange={e => setEditingName(e.target.value)}
-                                                        onKeyDown={e => { if (e.key === 'Enter') handleRenameFolder(folder.id); if (e.key === 'Escape') { setEditingFolderId(null); setEditingName(''); } }}
-                                                        onBlur={() => handleRenameFolder(folder.id)}
-                                                        style={{ flex: 1, fontSize: '13px', background: t.bgInput, border: `1px solid ${t.borderFocus}`, borderRadius: '4px', padding: '2px 6px', color: t.textHeading, outline: 'none', minWidth: 0 }}
-                                                    />
-                                                ) : (
-                                                    <div onClick={() => toggleFolderExpand(folder.id)} style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                                                        <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: t.text }}>{folder.name}</span>
-                                                        <span style={{ fontSize: '9px', color: t.textMuted, marginTop: '1px' }}>Created {formatDate(folder.createdAt)}</span>
-                                                    </div>
-                                                )}
-
-                                                {fChats.length > 0 && !editing && (<span style={{ fontSize: '10px', color: t.textMuted, background: t.badge, borderRadius: '8px', padding: '0 5px' }}>{fChats.length}</span>)}
-                                                {!editing && (
-                                                    <button onClick={e => { e.stopPropagation(); setFolderMenuId(menu ? null : folder.id); }}
-                                                        style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: 0.6 }}
-                                                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                                                        onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
-                                                    ><MoreVertical size={13} /></button>
-                                                )}
-
-                                                {menu && (
-                                                    <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: t.dropdown, border: `1px solid ${t.dropdownBorder}`, borderRadius: '6px', padding: '4px', minWidth: '120px', boxShadow: `0 4px 12px ${t.shadow}` }}>
-                                                        <button onClick={() => { setEditingFolderId(folder.id); setEditingName(folder.name); setFolderMenuId(null); }}
-                                                            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.text, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}
-                                                            onMouseEnter={e => (e.currentTarget.style.background = t.dropdownHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                                        ><Pencil size={12} /> Rename</button>
-                                                        <button onClick={() => handleDeleteFolder(folder.id)}
-                                                            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.danger, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}
-                                                            onMouseEnter={e => (e.currentTarget.style.background = t.dropdownHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                                        ><Trash2 size={12} /> Delete</button>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {exp && (
-                                                <div style={{ marginLeft: '24px', borderLeft: `1px solid ${t.border}`, paddingLeft: '8px' }}>
-                                                    {fChats.length === 0 ? (
-                                                        <div style={{ fontSize: '11px', color: t.textMuted, padding: '6px 0' }}>Empty — drag chats here</div>
-                                                    ) : fChats.map(chat => (
-                                                        <div key={chat.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px', padding: '2px 4px', transition: 'background 0.15s' }}
-                                                            onMouseEnter={e => (e.currentTarget.style.background = t.bgHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                                                        >
-                                                            <a href={chat.url} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, textDecoration: 'none', color: t.text, overflow: 'hidden', padding: '4px 2px' }}>
-                                                                <MessageSquare size={11} style={{ color: t.textMuted, flexShrink: 0 }} />
-                                                                <span style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{chat.title}</span>
-                                                            </a>
-                                                            {/* Pin Button */}
-                                                            <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleTogglePin(chat.id); }} title={chat.isPinned ? "Unpin chat" : "Pin chat"}
-                                                                style={{ background: 'none', border: 'none', color: chat.isPinned ? t.accent : t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: chat.isPinned ? 1 : 0.3 }}
-                                                                onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = chat.isPinned ? '1' : '0.3')}
-                                                            ><Pin size={11} fill={chat.isPinned ? t.accent : 'none'} /></button>
-
-                                                            {/* Remove from Folder Button */}
-                                                            <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleAssignToFolder(chat.id, undefined); }} title="Remove from folder"
-                                                                style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: 0.3 }}
-                                                                onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.3')}
-                                                            ><X size={11} /></button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                {/* Only render top-level folders */}
+                                {appState.folders.filter(f => !f.parentId).map(folder => renderFolderNode(folder, 0))}
                             </div>
                         )}
                     </div>
                 )}
 
                 {/* Recent Chats / Search Results */}
-                <div>
+                <div
+                    // Area to drop files/folders back to ROOT level
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Drop chat -> remove from folder
+                        const chatId = e.dataTransfer.getData('application/chat-id');
+                        if (chatId) handleAssignToFolder(chatId, undefined);
+
+                        // Drop folder -> pull out to root level
+                        const folderId = e.dataTransfer.getData('application/folder-id');
+                        if (folderId) handleAssignFolderToFolder(folderId, undefined);
+                    }}
+                    style={{ minHeight: '100px', paddingBottom: '20px' }}
+                >
                     <div style={{ marginBottom: '8px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: t.textMuted }}>
                         {searchResults ? 'Search Results' : `Recent Chats (${displayChats.length})`}
                     </div>
@@ -289,7 +375,9 @@ export default function SidebarContainer() {
                             <div style={{ fontSize: '12px', color: t.textMuted, padding: '8px', textAlign: 'center', border: `1px dashed ${t.border}`, borderRadius: '6px' }}>No chats found</div>
                         ) : displayChats.map(chat => (
                             <div key={chat.id}
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px', padding: '4px 6px', position: 'relative', transition: 'background 0.15s' }}
+                                draggable
+                                onDragStart={(e) => { e.dataTransfer.setData('application/chat-id', chat.id); }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px', padding: '4px 6px', position: 'relative', transition: 'background 0.15s', cursor: 'grab' }}
                                 onMouseEnter={e => (e.currentTarget.style.background = t.bgHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                             >
                                 <a href={chat.url} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, textDecoration: 'none', color: t.text, overflow: 'hidden', padding: '4px 2px' }}>
@@ -314,6 +402,7 @@ export default function SidebarContainer() {
                                 {assigningChatId === chat.id && (
                                     <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: t.dropdown, border: `1px solid ${t.dropdownBorder}`, borderRadius: '6px', padding: '4px', minWidth: '140px', boxShadow: `0 4px 12px ${t.shadow}` }}>
                                         <div style={{ padding: '4px 8px', fontSize: '10px', color: t.textMuted, textTransform: 'uppercase', fontWeight: 600 }}>Move to...</div>
+                                        {/* Only show top-level folders for manual drop to not clutter. Or keep simple mapping, we just map all folders with indentation or parent name. Let's map all folders for now to avoid breaking existing feature. */}
                                         {appState.folders.map(folder => (
                                             <button key={folder.id} onClick={() => handleAssignToFolder(chat.id, folder.id)}
                                                 style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.text, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}

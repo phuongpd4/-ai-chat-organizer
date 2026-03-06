@@ -8,6 +8,7 @@ export interface Folder {
     name: string;
     color: string;
     createdAt: number;
+    parentId?: string;
 }
 
 export interface ChatNode {
