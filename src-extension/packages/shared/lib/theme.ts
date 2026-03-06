@@ -77,14 +77,42 @@ export function getTheme(mode: ThemeMode): ThemeColors {
 
 export async function getSavedTheme(): Promise<ThemeMode> {
     return new Promise((resolve) => {
-        chrome.storage.sync.get(['themeMode'], (result) => {
-            resolve(result.themeMode === 'light' ? 'light' : 'dark');
-        });
+        try {
+            chrome.storage.sync.get(['themeMode'], (res) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[AI Chat Org] Get Theme Error:', chrome.runtime.lastError);
+                    resolve('dark'); // Fallback
+                    return;
+                }
+                const saved = res.themeMode;
+                if (saved === 'light' || saved === 'dark') {
+                    resolve(saved);
+                } else {
+                    resolve('dark'); // default
+                }
+            });
+        } catch (e) {
+            console.warn('[AI Chat Org] Extension context invalidated in getSavedTheme:', e);
+            resolve('dark');
+        }
     });
 }
 
+/**
+ * Lưu lựa chọn theme của User vào storage
+ */
 export async function saveTheme(mode: ThemeMode): Promise<void> {
     return new Promise((resolve) => {
-        chrome.storage.sync.set({ themeMode: mode }, () => resolve());
+        try {
+            chrome.storage.sync.set({ themeMode: mode }, () => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[AI Chat Org] Set Theme Error:', chrome.runtime.lastError);
+                }
+                resolve();
+            });
+        } catch (e) {
+            console.warn('[AI Chat Org] Extension context invalidated in saveTheme:', e);
+            resolve();
+        }
     });
 }
