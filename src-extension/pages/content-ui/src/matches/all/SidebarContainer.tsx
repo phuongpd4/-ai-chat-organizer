@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { AppStorage, getStorageData, saveFolders, saveChats, Folder, ChatNode } from '@extension/shared/lib/storage';
 import { useDOMObserver } from '@extension/shared/hooks/useDOMObserver';
 import { getTheme, getSavedTheme, saveTheme, ThemeMode, ThemeColors } from '@extension/shared/lib/theme';
-import { FolderIcon, Plus, MoreVertical, MessageSquare, Pencil, Trash2, ChevronDown, ChevronRight, FolderInput, X, Sun, Moon } from 'lucide-react';
+import { FolderIcon, Plus, MoreVertical, MessageSquare, Pencil, Trash2, ChevronDown, ChevronRight, FolderInput, X, Sun, Moon, Pin } from 'lucide-react';
 import SearchBar from './SearchBar';
 
 export default function SidebarContainer() {
@@ -23,7 +23,7 @@ export default function SidebarContainer() {
         getStorageData().then(setAppState);
         getSavedTheme().then(setThemeMode);
 
-        // Lắng nghe thay đổi theme từ popup
+        // Lắng nghe thay đổi theme & storage
         const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
             if (areaName === 'sync' && changes.themeMode) {
                 setThemeMode(changes.themeMode.newValue === 'light' ? 'light' : 'dark');
@@ -81,7 +81,7 @@ export default function SidebarContainer() {
         setExpandedFolders(prev => { const n = new Set(prev); n.has(folderId) ? n.delete(folderId) : n.add(folderId); return n; });
     };
 
-    // ── Chat → Folder Assignment ────────────────────
+    // ── Chat Actions (Assign / Pin) ─────────────────
     const handleAssignToFolder = (chatId: string, folderId: string | undefined) => {
         if (!appState) return;
         let updatedChats = [...appState.chats];
@@ -96,6 +96,32 @@ export default function SidebarContainer() {
         saveChats(updatedChats);
         setAssigningChatId(null);
         if (folderId) setExpandedFolders(prev => new Set([...prev, folderId]));
+    };
+
+    const handleTogglePin = (chatId: string) => {
+        if (!appState) return;
+        let updatedChats = [...appState.chats];
+        const idx = updatedChats.findIndex(c => c.id === chatId);
+        if (idx >= 0) {
+            updatedChats[idx] = { ...updatedChats[idx], isPinned: !updatedChats[idx].isPinned };
+        } else {
+            const native = allChats.find(c => c.id === chatId);
+            if (native) updatedChats.push({ ...native, isPinned: true });
+        }
+        setAppState({ ...appState, chats: updatedChats });
+        saveChats(updatedChats);
+    };
+
+    const sortChats = (chats: ChatNode[]) => {
+        return [...chats].sort((a, b) => {
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
+            return (b.createdAt || 0) - (a.createdAt || 0);
+        });
+    };
+
+    const formatDate = (ts: number) => {
+        return new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
     };
 
     if (!appState) return null;
@@ -122,7 +148,9 @@ export default function SidebarContainer() {
         if (ch.folderId) { const a = chatsInFolders.get(ch.folderId) || []; a.push(ch); chatsInFolders.set(ch.folderId, a); }
         else unassignedChats.push(ch);
     }
-    const displayChats = searchResults || unassignedChats;
+
+    // Sort unassigned and search results
+    const displayChats = sortChats(searchResults || unassignedChats);
 
     // ── Render ───────────────────────────────────────
     return (
@@ -163,7 +191,7 @@ export default function SidebarContainer() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 {appState.folders.map(folder => {
                                     const exp = expandedFolders.has(folder.id);
-                                    const fChats = chatsInFolders.get(folder.id) || [];
+                                    const fChats = sortChats(chatsInFolders.get(folder.id) || []);
                                     const editing = editingFolderId === folder.id;
                                     const menu = folderMenuId === folder.id;
 
@@ -187,7 +215,10 @@ export default function SidebarContainer() {
                                                         style={{ flex: 1, fontSize: '13px', background: t.bgInput, border: `1px solid ${t.borderFocus}`, borderRadius: '4px', padding: '2px 6px', color: t.textHeading, outline: 'none', minWidth: 0 }}
                                                     />
                                                 ) : (
-                                                    <span onClick={() => toggleFolderExpand(folder.id)} style={{ flex: 1, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: t.text }}>{folder.name}</span>
+                                                    <div onClick={() => toggleFolderExpand(folder.id)} style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                                                        <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: t.text }}>{folder.name}</span>
+                                                        <span style={{ fontSize: '9px', color: t.textMuted, marginTop: '1px' }}>Created {formatDate(folder.createdAt)}</span>
+                                                    </div>
                                                 )}
 
                                                 {fChats.length > 0 && !editing && (<span style={{ fontSize: '10px', color: t.textMuted, background: t.badge, borderRadius: '8px', padding: '0 5px' }}>{fChats.length}</span>)}
@@ -218,17 +249,25 @@ export default function SidebarContainer() {
                                                     {fChats.length === 0 ? (
                                                         <div style={{ fontSize: '11px', color: t.textMuted, padding: '6px 0' }}>Empty — drag chats here</div>
                                                     ) : fChats.map(chat => (
-                                                        <a key={chat.id} href={chat.url}
-                                                            style={{ display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '4px', padding: '4px 6px', textDecoration: 'none', color: t.text, fontSize: '12px', transition: 'background 0.15s' }}
+                                                        <div key={chat.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px', padding: '2px 4px', transition: 'background 0.15s' }}
                                                             onMouseEnter={e => (e.currentTarget.style.background = t.bgHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                                         >
-                                                            <MessageSquare size={11} style={{ color: t.textMuted, flexShrink: 0 }} />
-                                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{chat.title}</span>
-                                                            <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleAssignToFolder(chat.id, undefined); }} title="Remove"
-                                                                style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: 0.5 }}
-                                                                onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}
+                                                            <a href={chat.url} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, textDecoration: 'none', color: t.text, overflow: 'hidden', padding: '4px 2px' }}>
+                                                                <MessageSquare size={11} style={{ color: t.textMuted, flexShrink: 0 }} />
+                                                                <span style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{chat.title}</span>
+                                                            </a>
+                                                            {/* Pin Button */}
+                                                            <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleTogglePin(chat.id); }} title={chat.isPinned ? "Unpin chat" : "Pin chat"}
+                                                                style={{ background: 'none', border: 'none', color: chat.isPinned ? t.accent : t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: chat.isPinned ? 1 : 0.3 }}
+                                                                onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = chat.isPinned ? '1' : '0.3')}
+                                                            ><Pin size={11} fill={chat.isPinned ? t.accent : 'none'} /></button>
+
+                                                            {/* Remove from Folder Button */}
+                                                            <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleAssignToFolder(chat.id, undefined); }} title="Remove from folder"
+                                                                style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: 0.3 }}
+                                                                onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.3')}
                                                             ><X size={11} /></button>
-                                                        </a>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             )}
@@ -250,19 +289,28 @@ export default function SidebarContainer() {
                             <div style={{ fontSize: '12px', color: t.textMuted, padding: '8px', textAlign: 'center', border: `1px dashed ${t.border}`, borderRadius: '6px' }}>No chats found</div>
                         ) : displayChats.map(chat => (
                             <div key={chat.id}
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px', padding: '6px 8px', position: 'relative', transition: 'background 0.15s' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px', padding: '4px 6px', position: 'relative', transition: 'background 0.15s' }}
                                 onMouseEnter={e => (e.currentTarget.style.background = t.bgHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                             >
-                                <a href={chat.url} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, textDecoration: 'none', color: t.text, overflow: 'hidden' }}>
+                                <a href={chat.url} style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, textDecoration: 'none', color: t.text, overflow: 'hidden', padding: '4px 2px' }}>
                                     <MessageSquare size={13} style={{ color: t.textMuted, flexShrink: 0 }} />
                                     <span style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{chat.title}</span>
                                 </a>
+
+                                {/* Pin Button */}
+                                <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleTogglePin(chat.id); }} title={chat.isPinned ? "Unpin chat" : "Pin chat"}
+                                    style={{ background: 'none', border: 'none', color: chat.isPinned ? t.accent : t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: chat.isPinned ? 1 : 0.3, flexShrink: 0 }}
+                                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = chat.isPinned ? '1' : '0.3')}
+                                ><Pin size={13} fill={chat.isPinned ? t.accent : 'none'} /></button>
+
+                                {/* Move to Folder button */}
                                 {appState.folders.length > 0 && (
                                     <button onClick={e => { e.stopPropagation(); setAssigningChatId(assigningChatId === chat.id ? null : chat.id); }} title="Move to folder"
-                                        style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: 0.5, flexShrink: 0 }}
-                                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.5')}
+                                        style={{ background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', padding: '2px', display: 'flex', opacity: 0.3, flexShrink: 0 }}
+                                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.3')}
                                     ><FolderInput size={13} /></button>
                                 )}
+
                                 {assigningChatId === chat.id && (
                                     <div style={{ position: 'absolute', right: 0, top: '100%', zIndex: 50, background: t.dropdown, border: `1px solid ${t.dropdownBorder}`, borderRadius: '6px', padding: '4px', minWidth: '140px', boxShadow: `0 4px 12px ${t.shadow}` }}>
                                         <div style={{ padding: '4px 8px', fontSize: '10px', color: t.textMuted, textTransform: 'uppercase', fontWeight: 600 }}>Move to...</div>
