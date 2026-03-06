@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Plan: AI Chat Organizer Extension</title>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,400;0,600;0,700;1,400&family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0e0e12;
+  --paper: #faf9f6;
+  --paper2: #f2f0eb;
+  --border: #e2dfd8;
+  --muted: #8a8880;
+  --accent: #d4501a;    /* burnt orange */
+  --accent2: #1a6b4a;   /* forest green */
+  --accent3: #1e4d8c;   /* deep blue */
+  --yellow: #f5c842;
+  --text: #2a2928;
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+body {
+  background: var(--paper);
+  color: var(--text);
+  font-family: 'Familjen Grotesk', sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+/* ─── MASTHEAD ─── */
+.masthead {
+  background: var(--ink);
+  color: var(--paper);
+  position: relative;
+  overflow: hidden;
+}
+
+.masthead-stripe {
+  height: 4px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 60px, var(--yellow) 60px 120px, var(--accent2) 120px 180px, var(--accent3) 180px 240px);
+}
+
+.masthead-body {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 56px 56px 0;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 48px;
+  align-items: end;
+}
+
+.masthead-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 12px;
+}
+.masthead-kicker::before { content: ''; width: 32px; height: 1px; background: var(--accent); }
+
+.masthead-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.4rem, 5.5vw, 4.2rem);
+  line-height: 1.05;
+  font-weight: 400;
+  margin-bottom: 20px;
+  color: var(--paper);
+}
+
+.masthead-title em {
+  font-style: italic;
+  color: var(--yellow);
+}
+
+.masthead-sub {
+  font-size: 15px;
+  color: rgba(250,249,246,.55);
+  max-width: 500px;
+  line-height: 1.7;
+  margin-bottom: 48px;
+  font-style: italic;
+}
+
+/* verdict box top-right */
+.verdict-box {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 28px;
+  text-align: center;
+  align-self: start;
+  margin-top: 56px;
+}
+.verdict-score {
+  font-family: 'DM Serif Display', serif;
+  font-size: 4.5rem;
+  line-height: 1;
+  color: var(--yellow);
+  margin-bottom: 4px;
+}
+.verdict-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase; color: rgba(250,249,246,.4); margin-bottom: 16px; }
+.verdict-tag { display: inline-block; background: var(--accent2); color: #fff; font-size: 11px; font-weight: 700; padding: 6px 14px; border-radius: 100px; letter-spacing: 0.06em; }
+
+/* bottom stats bar */
+.stats-bar {
+  background: rgba(255,255,255,0.04);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 48px;
+}
+
+.stat-cell {
+  padding: 24px 28px;
+  border-right: 1px solid rgba(255,255,255,0.07);
+}
+.stat-cell:last-child { border-right: none; }
+
+.stat-n {
+  font-family: 'DM Serif Display', serif;
+  font-size: 2rem;
+  color: var(--paper);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-n span { color: var(--accent); }
+.stat-l { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(250,249,246,.35); }
+
+/* ─── LAYOUT ─── */
+.body-wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 60px 56px;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 56px;
+  align-items: start;
+}
+
+.main { min-width: 0; }
+
+/* ─── SECTIONS ─── */
+.section { margin-bottom: 52px; }
+
+.section-head {
+  display: flex; align-items: center; gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--ink);
+  margin-bottom: 24px;
+}
+.sec-num { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.2em; }
+.sec-icon { font-size: 1.2rem; }
+.sec-title { font-family: 'DM Serif Display', serif; font-size: 1.5rem; font-weight: 400; }
+
+p { color: var(--text); margin-bottom: 14px; line-height: 1.75; }
+p:last-child { margin-bottom: 0; }
+strong { color: var(--ink); }
+
+/* ─── COMPETITOR TABLE ─── */
+.comp-wrap { overflow-x: auto; margin: -4px; }
+
+.comp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.comp-table th {
+  background: var(--ink);
+  color: var(--paper);
+  padding: 12px 16px;
+  text-align: left;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.comp-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.55;
+}
+.comp-table tr:last-child td { border-bottom: none; }
+.comp-table tr:nth-child(even) td { background: var(--paper2); }
+.comp-name { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
+.threat { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+.t-high { background: #fde8e4; color: #c0351a; }
+.t-med  { background: #fef3cc; color: #a07c00; }
+.t-low  { background: #e4f3ea; color: #1a6b4a; }
+.gap-text { color: var(--accent2); font-size: 12px; font-weight: 600; }
+
+/* ─── FEATURE MATRIX ─── */
+.feat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.feat-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.feat-card:hover { border-color: var(--accent); box-shadow: 0 8px 24px rgba(212,80,26,.08); }
+
+.feat-tier {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.tier-free { color: var(--muted); }
+.tier-pro { color: var(--accent); }
+.tier-team { color: var(--accent3); }
+
+.feat-card h4 { font-size: 0.9rem; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+.feat-card p { font-size: 12px; color: var(--muted); margin: 0; }
+
+/* ─── PRICING BLOCK ─── */
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+.price-card {
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+  transition: border-color .2s;
+}
+.price-card.featured {
+  border-color: var(--accent);
+  background: var(--ink);
+  color: var(--paper);
+}
+.price-card.featured .plan-name { color: var(--paper); }
+.price-card.featured .plan-price { color: var(--yellow); }
+.price-card.featured li { color: rgba(250,249,246,.7); }
+
+.badge-hot {
+  position: absolute;
+  top: -12px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #fff;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.15em;
+  padding: 4px 12px; border-radius: 100px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.plan-name { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: block; }
+.plan-price { font-family: 'DM Serif Display', serif; font-size: 2.4rem; color: var(--ink); line-height: 1; margin-bottom: 4px; }
+.plan-period { font-size: 11px; color: var(--muted); margin-bottom: 20px; display: block; }
+
+.price-card ul { list-style: none; text-align: left; margin-bottom: 20px; }
+.price-card li { font-size: 12.5px; padding: 5px 0; color: var(--text); display: flex; gap: 8px; align-items: flex-start; border-bottom: 1px solid var(--border); }
+.price-card.featured li { border-bottom-color: rgba(255,255,255,0.08); }
+.price-card li::before { content: '→'; color: var(--accent2); font-weight: 800; flex-shrink: 0; }
+.price-cta {
+  display: block; width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 700; font-size: 12px;
+  background: var(--paper2); color: var(--ink);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-family: 'Familjen Grotesk', sans-serif;
+}
+.price-card.featured .price-cta { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ─── ROADMAP ─── */
+.roadmap { position: relative; }
+.roadmap::before {
+  content: '';
+  position: absolute;
+  left: 18px; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent2), var(--accent3), var(--yellow));
+}
+
+.rm-step {
+  display: flex; gap: 28px;
+  padding: 20px 0;
+}
+
+.rm-dot {
+  width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700; font-size: 0.8rem;
+  color: var(--accent);
+  z-index: 1;
+  position: relative;
+}
+
+.rm-content { padding-top: 4px; }
+.rm-time { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.rm-content h4 { font-weight: 700; font-size: 1rem; color: var(--ink); margin-bottom: 6px; }
+.rm-content p { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.65; }
+
+/* ─── REVENUE PROJECTION ─── */
+.rev-table { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-size: 13px; }
+.rev-table th { background: var(--paper2); padding: 12px 16px; text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 500; }
+.rev-table td { padding: 13px 16px; border-bottom: 1px solid var(--border); color: var(--text); }
+.rev-table tr:last-child td { border-bottom: none; background: var(--ink); color: var(--paper); font-weight: 700; }
+.rev-table tr:last-child td:first-child { border-radius: 0; }
+.rev-num { font-family: 'DM Serif Display', serif; font-size: 1.1rem; color: var(--accent2); }
+.rev-table tr:last-child .rev-num { color: var(--yellow); font-size: 1.3rem; }
+
+/* ─── MARKETING ─── */
+.channel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.channel-card {
+  background: var(--paper2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.ch-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.ch-name { font-weight: 700; font-size: 0.9rem; color: var(--ink); }
+.ch-effort { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; padding: 3px 8px; border-radius: 100px; }
+.eff-low  { background: #e4f3ea; color: #1a6b4a; }
+.eff-med  { background: #fef3cc; color: #a07c00; }
+.eff-high { background: #fde8e4; color: #c0351a; }
+.ch-desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+
+/* ─── RISKS ─── */
+.risk-list { display: flex; flex-direction: column; gap: 12px; }
+.risk-item { display: flex; gap: 16px; background: var(--paper2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.risk-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }
+.risk-title { font-weight: 700; font-size: 0.9rem; color: var(--ink); margin-bottom: 3px; }
+.risk-desc { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.risk-mitigation { font-size: 11.5px; color: var(--accent2); font-weight: 600; margin-top: 5px; }
+
+/* ─── SIDEBAR ─── */
+.sidebar { position: sticky; top: 24px; }
+
+.scard {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 18px;
+}
+
+.scard-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.kpi { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px dotted var(--border); }
+.kpi:last-child { border-bottom: none; }
+.kpi-l { font-size: 12px; color: var(--muted); }
+.kpi-v { font-weight: 700; font-size: 0.95rem; color: var(--ink); font-family: 'DM Serif Display', serif; }
+.kpi-v.green { color: var(--accent2); }
+.kpi-v.orange { color: var(--accent); }
+.kpi-v.red { color: #c0351a; }
+
+.evidence-box {
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 18px;
+}
+.ev-title { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.28em; text-transform: uppercase; color: rgba(250,249,246,.4); margin-bottom: 16px; }
+.ev-name { font-family: 'DM Serif Display', serif; font-size: 1.4rem; color: var(--yellow); margin-bottom: 4px; }
+.ev-revenue { font-family: 'DM Serif Display', serif; font-size: 2.2rem; color: #fff; line-height: 1; margin-bottom: 3px; }
+.ev-period { font-size: 11px; color: rgba(250,249,246,.4); margin-bottom: 14px; }
+.ev-desc { font-size: 12.5px; color: rgba(250,249,246,.65); line-height: 1.65; }
+
+.action-list { list-style: none; }
+.action-list li {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 13px; padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.5;
+}
+.action-list li:last-child { border-bottom: none; }
+.action-n {
+  width: 22px; height: 22px; flex-shrink: 0;
+  background: var(--ink); color: var(--paper);
+  border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem; font-weight: 700;
+  margin-top: 1px;
+}
+
+/* ─── QUOTE ─── */
+.pullquote {
+  border-left: 3px solid var(--accent);
+  padding: 14px 22px;
+  background: var(--paper2);
+  border-radius: 0 8px 8px 0;
+  margin: 20px 0;
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--text);
+  line-height: 1.7;
+}
+.pullquote cite { display: block; font-style: normal; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); margin-top: 8px; letter-spacing: 0.1em; }
+
+/* ─── TECH STACK ─── */
+.stack-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stack-item { background: var(--paper2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.stack-cat { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+.stack-val { font-size: 13px; font-weight: 700; color: var(--ink); }
+.stack-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:880px){
+  .masthead-body,.body-wrap { grid-template-columns:1fr; padding:32px 20px; }
+  .stats-bar { grid-template-columns: repeat(2,1fr); }
+  .feat-grid,.pricing-grid,.channel-grid,.stack-grid { grid-template-columns:1fr; }
+  .verdict-box { margin-top:0; }
+  .sidebar { position: static; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ MASTHEAD ═══ -->
+<div class="masthead">
+  <div class="masthead-stripe"></div>
+  <div class="masthead-body">
+    <div>
+      <div class="masthead-kicker">Game Plan · Extension Strategy · March 2026</div>
+      <h1 class="masthead-title">
+        AI Chat <em>History</em><br>Organizer &amp; Search
+      </h1>
+      <p class="masthead-sub">Kế hoạch đầy đủ từ ý tưởng đến $10K/tháng — phân tích đối thủ, build roadmap, pricing, marketing và những rủi ro phải biết.</p>
+    </div>
+    <div class="verdict-box">
+      <div class="verdict-label">Monetize Score</div>
+      <div class="verdict-score">8.4</div>
+      <div class="verdict-label" style="margin-bottom:12px;">/ 10</div>
+      <div class="verdict-tag">✓ Nên làm</div>
+    </div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat-cell">
+      <div class="stat-n">800<span>M</span></div>
+      <div class="stat-l">ChatGPT weekly active users</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-n">$20<span>K</span></div>
+      <div class="stat-l">Superpower ChatGPT MRR (verified)</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-n">200<span>K+</span></div>
+      <div class="stat-l">Superpower users đã đạt</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-n">$0</div>
+      <div class="stat-l">Chi phí server — pure Chrome storage</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BODY ═══ -->
+<div class="body-wrap">
+<div class="main">
+
+  <!-- 01 WHY NOW -->
+  <div class="section">
+    <div class="section-head">
+      <span class="sec-num">01</span>
+      <span class="sec-icon">🎯</span>
+      <h2 class="sec-title">Tại sao đây là thời điểm đúng</h2>
+    </div>
+
+    <p>
+      <strong>ChatGPT vừa đạt 800 triệu weekly active users</strong> tính đến 2025 — và OpenAI vẫn chưa build được một tính năng organize history đàng hoàng. Đây là khoảng trống có chủ ý của sản phẩm (OpenAI muốn giữ UI đơn giản) nhưng lại là pain point thực sự với power users.
+    </p>
+
+    <p>
+      Bằng chứng sống động nhất: <strong>Superpower ChatGPT</strong> — một extension làm đúng việc này — đã được Saeed Ezzati build một mình và hiện kiếm <strong>$20,000/tháng</strong>, với hơn 200,000 users. Extension thứ hai, <strong>Easy Folders</strong>, đang ở $3,700/tháng. Đây không phải số estimate — là số verified.
+    </p>
+
+    <div class="pullquote">
+      "Tôi bắt đầu bằng cách giải quyết vấn đề của chính mình. Sau đó lên Reddit, Discord, Facebook groups để nghe người dùng phàn nàn về ChatGPT — và build từng tính năng theo đó."
+      <cite>— Saeed Ezzati, Founder Superpower ChatGPT · $20K/tháng</cite>
+    </div>
+
+    <p>
+      Điều quan trọng cần hiểu: thị trường này <strong>chưa bão hòa</strong>. Superpower ChatGPT đã có 200K users nhưng tổng addressable market là hàng chục triệu power users. Và nhu cầu đang tăng vì người dùng ngày càng có nhiều chat history hơn, từ nhiều AI tool hơn (ChatGPT, Claude, Gemini, Grok).
+    </p>
+  </div>
+
+  <!-- 02 COMPETITOR ANALYSIS -->
+  <div class="section">
+    <div class="section-head">
+      <span class="sec-num">02</span>
+      <span class="sec-icon">⚔️</span>
+      <h2 class="sec-title">Phân tích đối thủ — Và khoảng trống</h2>
+    </div>
+
+    <p>Đây là landscape thực tế. Không phải không có đối thủ — nhưng mỗi đối thủ đều có điểm yếu có thể khai thác.</p>
+
+    <div class="comp-wrap">
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Extension</th>
+          <th>Users ước tính</th>
+          <th>Model/Giá</th>
+          <th>Điểm yếu rõ nhất</th>
+          <th>Cơ hội tấn công</th>
+          <th>Mức độ đe dọa</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="comp-name">Superpower ChatGPT</div>spchatgpt.com</td>
+          <td>200,000+</td>
+          <td>Freemium · Pro subscription</td>
+          <td>Chỉ hỗ trợ ChatGPT, không có Claude/Gemini. UI phức tạp cho user mới. Quá nhiều features nhồi nhét.</td>
+          <td class="gap-text">→ Multi-platform (ChatGPT + Claude + Gemini trong 1 tool)<br>→ UX sạch, đơn giản hơn</td>
+          <td><span class="threat t-high">Cao</span></td>
+        </tr>
+        <tr>
+          <td><div class="comp-name">Easy Folders</div>easyfolders.io</td>
+          <td>~50,000</td>
+          <td>Freemium · $3.99–$7.99/tháng</td>
+          <td>Chỉ có folders, không có smart search, không export, không AI tagging. Chỉ ChatGPT và Claude.</td>
+          <td class="gap-text">→ AI auto-tagging<br>→ Full-text semantic search<br>→ Export Notion/Markdown</td>
+          <td><span class="threat t-med">Trung bình</span></td>
+        </tr>
+        <tr>
+          <td><div class="comp-name">Echoes</div>(Chrome store)</td>
+          <td>~20,000</td>
+          <td>Freemium</td>
+          <td>UX phức tạp, nhiều bugs, developer ít resource. Review trên store phàn nàn về stability.</td>
+          <td class="gap-text">→ Build stable hơn<br>→ UX onboarding tốt hơn</td>
+          <td><span class="threat t-low">Thấp</span></td>
+        </tr>
+        <tr>
+          <td><div class="comp-name">ChatGPT Toolbox</div></td>
+          <td>~30,000</td>
+          <td>Freemium</td>
+          <td>Chỉ ChatGPT. Không có cross-platform. Monetization còn yếu.</td>
+          <td class="gap-text">→ Cross-platform là USP lớn<br>→ AI summary per-folder</td>
+          <td><span class="threat t-low">Thấp</span></td>
+        </tr>
+        <tr>
+          <td><div class="comp-name">Native ChatGPT</div>OpenAI</td>
+          <td>800M</td>
+          <td>Free + $20/tháng Plus</td>
+          <td>Search yếu, không có folders, không có export. OpenAI không có incentive để làm tốt việc này.</td>
+          <td class="gap-text">→ Đây là "sản phẩm mẹ" — extension bổ sung chứ không thay thế</td>
+          <td><span class="threat t-med">Tiềm ẩn</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p style="margin-top:18px;">
+      <strong>Kết luận:</strong> Superpower ChatGPT là đối thủ đáng sợ nhất, nhưng weakness của họ là rõ ràng — chỉ ChatGPT, UX phức tạp. Nếu anh build <strong>cross-platform (ChatGPT + Claude + Gemini) với UX đơn giản + AI auto-tagging</strong>, đây là differentiator thực sự.
+    </p>
+  </div>
+
+  <!-- 03 PRODUCT STRATEGY -->
+  <div class="section">
+    <div class="section-head">
+      <span class="sec-num">03</span>
+      <span class="sec-icon">🏗️</span>
+      <h2 class="sec-title">Chiến lược sản phẩm — Build gì, theo thứ tự nào</h2>
+    </div>
+
+    <p>Sai lầm phổ biến nhất: build quá nhiều thứ từ đầu. Superpower ChatGPT bắt đầu với <strong>1 feature duy nhất</strong> — folder — rồi mới mở rộng. Đây là roadmap feature theo đúng thứ tự ưu tiên:</p>
+
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-tier tier-free">Phase 1 · Free Core</div>
+        <h4>📁 Folder + Subfolder</h4>
+        <p>Drag-and-drop chat vào folder. Color coding. Collapsible sidebar. Works trên ChatGPT &amp; Claude.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-tier tier-free">Phase 1 · Free Core</div>
+        <h4>🔍 Full-text Search</h4>
+        <p>Search keyword trong toàn bộ chat history. Highlight kết quả. Filter by date/platform.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-tier tier-free">Phase 1 · Free Core</div>
+        <h4>📌 Pin &amp; Bookmark</h4>
+        <p>Pin chat quan trọng lên top. Bookmark message cụ thể trong conversation dài.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-tier tier-pro">Phase 2 · Pro Feature</div>
+        <h4>🤖 AI Auto-Tag</h4>
+        <p>Dùng AI để tự động tag conversation theo topic: "coding", "writing", "research". Không cần manual.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-tier tier-pro">Phase 2 · Pro Feature</div>
+        <h4>📤 Export Hub</h4>
+        <p>Export sang Markdown, Notion, PDF, Google Docs. Bulk export nhiều chats cùng lúc.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-tier tier-team">Phase 3 · Team</div>
+        <h4>👥 Shared Workspaces</h4>
+        <p>Share folder với team. Collaborative tagging. Team prompt library. $10–20/user/tháng.</p>
+      </div>
+    </div>
+
+    <p style="margin-top:18px;"><strong>USP cốt lõi cần nhấn mạnh khi launch:</strong> Đây là extension duy nhất hỗ trợ <strong>cả ChatGPT, Claude VÀ Gemini</strong> trong cùng một interface. Không cần install 3 extension khác nhau.</p>
+  </div>
+
+  <!-- 04 TECH STACK -->
+  <div class="section">
+    <div class="section-head">
+      <span class="sec-num">04</span>
+      <span class="sec-icon">⚙️</span>
+      <h2 class="sec-title">Tech Stack — Không cần backend</h2>
+    </div>
+
+    <p>Đây là điểm cực kỳ hấp dẫn của extension này: <strong>$0 chi phí server</strong>. Toàn bộ data lưu trong Chrome storage của user — không cần database, không cần server, không có chi phí vận hành.</p>
+
+    <div class="stack-grid">
+      <div class="stack-item">
+        <div class="stack-cat">Core Extension</div>
+        <div class="stack-val">Vanilla JS + Manifest V3</div>
+        <div class="stack-sub">DOM manipulation để inject UI vào ChatGPT/Claude/Gemini</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-cat">Data Storage</div>
+        <div class="stack-val">Chrome Storage API (sync)</div>
+        <div class="stack-sub">Tự động sync across devices — không cần backend</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-cat">Search Engine</div>
+        <div class="stack-val">Fuse.js (fuzzy search)</div>
+        <div class="stack-sub">Full-text search chạy hoàn toàn local — nhanh, private</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-cat">AI Auto-Tag (Pro)</div>
+        <div class="stack-val">Claude Haiku API</div>
+        <div class="stack-sub">~$0.001/lần tag. User cung cấp API key của họ để giữ cost = $0</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-cat">Payments</div>
+        <div class="stack-val">ExtensionPay (Stripe)</div>
+        <div class="stack-sub">Open source, zero backend code. Nhận payment trong 30 phút</div>
+      </div>
+      <div class="stack-item">
+        <div class="stack-cat">UI Framework</div>
+        <div class="stack-val">Preact (3KB)</div>
+        <div class="stack-sub">Nhẹ hơn React, đủ mạnh cho extension. Không làm chậm browser</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 PRICING -->
+  <div class="section">
+    <div class="section-head">
+      <span class="sec-num">05</span>
+      <span class="sec-icon">💰</span>
+      <h2 class="sec-title">Pricing Strategy — Học từ người đã làm</h2>
+    </div>
+
+    <p>Superpower ChatGPT giữ free tier mạnh trong 9 tháng đầu — chỉ charge sau khi đã có user base. Đây là model đúng. Nhưng anh không cần đợi 9 tháng — có thể charge sau 3–4 tháng khi đã có 5K+ users.</p>
+
+    <div class="pricing-grid">
+      <div class="price-card">
+        <span class="plan-name">Free Forever</span>
+        <div class="plan-price">$0</div>
+        <span class="plan-period">không giới hạn thời gian</span>
+        <ul>
+          <li>Folders không giới hạn</li>
+          <li>Full-text search</li>
+          <li>Pin 10 chats</li>
+          <li>ChatGPT + Claude support</li>
+          <li>Chrome sync</li>
+        </ul>
+        <button class="price-cta">Mặc định khi install</button>
+      </div>
+
+      <div class="price-card featured">
+        <div class="badge-hot">Recommended</div>
+        <span class="plan-name">Pro</span>
+        <div class="plan-price">$5.99</div>
+        <span class="plan-period">/ tháng · $48/năm (–33%)</span>
+        <ul>
+          <li>AI Auto-tagging</li>
+          <li>Export Notion / Markdown / PDF</li>
+          <li>Gemini support</li>
+          <li>Bulk actions</li>
+          <li>Unlimited pins &amp; bookmarks</li>
+          <li>Priority support</li>
+        </ul>
+        <button class="price-cta">Upsell sau 30 ngày dùng thử</button>
+      </div>
+
+      <div class="price-card">
+        <span class="plan-name">Team</span>
+        <div class="plan-price">$12</div>
+        <span class="plan-period">/ user / tháng · min 3 users</span>
+        <ul>
+          <li>Tất cả Pro features</li>
+          <li>Shared workspaces</li>
+          <li>Team prompt library</li>
+          <li>Admin dashboard</li>
+          <li>Billing tập trung</li>
+        </ul>
+        <button class="price-cta">Launch sau 6 tháng</button>
+      </div>
+    </div>
+
+    <p style="margin-top:18px;"><strong>Lifetime deal tactic:</strong> Khi launch, offer Lifetime deal $39 (limited 200 slots) để generate buzz và early cash flow. AppSumo là kênh phân phối tốt cho tactic này. Superpower ChatGPT đã dùng đúng approach này.</p>
+  </div>
+
+  <!-- 06 REVENUE PROJECTION -->
+  <div class="section">
+    <div class="section-head">
+      <span class="sec-num">06</span>
+      <span class="sec-icon">📈</span>
+      <h2 class="sec-title">Revenue Projection — Thực tế 12 tháng</h2>
+    </div>
+
+    <table class="rev-table">
+      <thead>
+        <tr>
+          <th>Milestone</th>
+          <th>Users (Free)</th>
+          <th>Pro Subscribers (3%)</th>
+          <th>MRR ($5.99)</th>
+          <th>Lifetime Deals</th>
+          <th>Total Revenue/tháng</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Tháng 1–2 · Launch</td>
+          <td>500–2,000</td>
+          <td>–</td>
+          <td>$0 (chưa charge)</td>
+          <td>$1,560 (40 deals × $39)</td>
+          <td class="rev-num">~$780/tháng</td>
+        </tr>
+        <tr>
+          <td>Tháng 3–4 · Enable Pro</td>
+          <td>5,000</td>
+          <td>150 users</td>
+          <td>$898</td>
+          <td>$780 (20 deals)</td>
+          <td class="rev-num">~$1,678</td>
+        </tr>
+        <tr>
+          <td>Tháng 5–6 · Growth</td>
+          <td>15,000</td>
+          <td>450 users</td>
+          <td>$2,696</td>
+          <td>$390 (10 deals)</td>
+          <td class="rev-num">~$3,086</td>
+        </tr>
+        <tr>
+          <td>Tháng 7–9 · Scale</td>
+          <td>35,000</td>
+          <td>1,050 users</td>
+          <td>$6,290</td>
+          <td>Newsletter sponsor $500</td>
+          <td class="rev-num">~$6,790</td>
+        </tr>
+        <tr>
+          <td>Tháng 10–12 · Compound</td>
+          <td>60,000</td>
+          <td>1,800 users + 20 team</td>
+          <td>$10,782 + $720 team</td>
+          <td>$1,000 sponsors</td>
+          <td class="rev-num" style="font-size:1.4rem">~$12,502</td>
+        </tr>
+        <tr>
+          <td colspan="5"><strong>Tổng kết năm 1</strong></td>
+          <td><span class="rev-num">~$75,000–$90,000</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:14px;font-size:12.5px;color:var(--muted);">* Dựa trên verified data từ Superpower ChatGPT ($20K/tháng ở 200K users) và Easy Folders ($3.7K/tháng). Projection trên dùng conversion rate conservative 3%. Superpower đạt 3–5%.</p>
+  </div>
+
+  <!-- 07 MARKETING -->
+  <div class="section">
+    <div class="section-head">
+      <span class="sec-num">07</span>
+      <span class="sec-icon">📣</span>
+      <h2 class="sec-title">Kế hoạch Marketing — Học đúng từ Saeed</h2>
+    </div>
+
+    <p>Superpower ChatGPT không dùng paid ads. Toàn bộ growth là organic từ communities. Đây là playbook đã verified:</p>
+
+    <div class="channel-grid">
+      <div class="channel-card">
+        <div class="ch-head">
+          <div class="ch-name">🔴 Reddit — r/ChatGPT, r/AITools</div>
+          <span class="ch-effort eff-low">Low effort · High ROI</span>
+        </div>
+        <div class="ch-desc">r/ChatGPT có 7M+ members. Post "Show HN"-style: "Tôi build extension giải quyết vấn đề X, muốn feedback". Không spam link — engage thật, help người, mention extension khi relevant. Saeed lấy phần lớn 200K users từ đây.</div>
+      </div>
+
+      <div class="channel-card">
+        <div class="ch-head">
+          <div class="ch-name">🚀 Product Hunt Launch</div>
+          <span class="ch-effort eff-med">Med effort · High visibility</span>
+        </div>
+        <div class="ch-desc">Chuẩn bị kỹ: GIF demo đẹp, tagline súc tích, social proof từ beta testers. Aim cho Top 5 của ngày. Một launch tốt = 500–2,000 users đầu tiên trong 48h. Lên kế hoạch ít nhất 2 tuần trước.</div>
+      </div>
+
+      <div class="channel-card">
+        <div class="ch-head">
+          <div class="ch-name">🐦 Twitter/X — AI Community</div>
+          <span class="ch-effort eff-low">Low effort · Organic reach</span>
+        </div>
+        <div class="ch-desc">Build in public từ ngày đầu: tweet progress, share milestones ($100 MRR, $1K MRR...). Tag @OpenAI, @AnthropicAI. AI Twitter là cộng đồng rất supportive với indie makers. Kèm theo GIF demo ngắn.</div>
+      </div>
+
+      <div class="channel-card">
+        <div class="ch-head">
+          <div class="ch-name">📧 Newsletter Saeed-style</div>
+          <span class="ch-effort eff-med">Med effort · Monetize early</span>
+        </div>
+        <div class="ch-desc">Saeed bắt đầu newsletter về AI tips cho user base của mình — và monetize newsletter TRƯỚC khi extension có Pro tier. Sponsor deal $500–2,000/send khi đạt 5K subscribers. Secondary revenue stream.</div>
+      </div>
+
+      <div class="channel-card">
+        <div class="ch-head">
+          <div class="ch-name">🎥 YouTube SEO</div>
+          <span class="ch-effort eff-high">High effort · Long-term</span>
+        </div>
+        <div class="ch-desc">"How to organize ChatGPT conversations" — search volume cao, ít video chất lượng. Tutorial video 5–10 phút với CTA install extension. Không cần mặt — screencast là đủ. 1 video tốt có thể drive 200–500 installs/tháng ongoing.</div>
+      </div>
+
+      <div class="channel-card">
+        <div class="ch-head">
+          <div class="ch-name">🤝 AppSumo Lifetime Deal</div>
+          <span class="ch-effort eff-med">Med effort · Lump-sum cash</span>
+        </div>
+        <div class="ch-desc">List lifetime deal $39–59 trên AppSumo khi đã có product stable. AppSumo đưa ra upfront cash + giới thiệu tới audience của họ (100K+ software buyers). Tactic lý tưởng để fund development phase tiếp theo.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 08 RISKS -->
+  <div class="section">
+    <div class="section-head">
+      <span class="sec-num">08</span>
+      <span class="sec-icon">⚠️</span>
+      <h2 class="sec-title">Rủi ro — Biết trước, phòng ngừa sớm</h2>
+    </div>
+
+    <div class="risk-list">
+      <div class="risk-item">
+        <div class="risk-icon">🔄</div>
+        <div>
+          <div class="risk-title">OpenAI thay đổi UI — Extension bị break</div>
+          <div class="risk-desc">Đây là rủi ro số 1. Khi ChatGPT update giao diện, DOM selectors thay đổi, extension có thể bị break. Superpower ChatGPT đã trải qua điều này nhiều lần.</div>
+          <div class="risk-mitigation">→ Mitigation: Monitor OpenAI updates, có CI test tự động, build in abstraction layer để update nhanh. Có responsive support team (dù là 1 người).</div>
+        </div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-icon">🏢</div>
+        <div>
+          <div class="risk-title">OpenAI native-build tính năng này</div>
+          <div class="risk-desc">Nếu OpenAI build folders/search vào ChatGPT, extension sẽ mất USP. Đây là rủi ro thực nhưng OpenAI đã có 800M users và vẫn chưa làm — họ tập trung vào model, không vào UX.</div>
+          <div class="risk-mitigation">→ Mitigation: Build cross-platform (Claude + Gemini) từ sớm để không phụ thuộc 100% vào ChatGPT. Nếu ChatGPT native-build, vẫn còn Claude và Gemini không làm điều đó.</div>
+        </div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-icon">📉</div>
+        <div>
+          <div class="risk-title">Superpower ChatGPT copy thêm features</div>
+          <div class="risk-desc">Đối thủ lớn nhất có thể add cross-platform support bất cứ lúc nào. 200K users và $20K/tháng là đủ resource để họ ship feature này.</div>
+          <div class="risk-mitigation">→ Mitigation: Move fast, launch trong 6–8 tuần. First-mover trong multi-platform + AI auto-tag sẽ tạo switching cost. Marketing sớm = brand recognition trước khi họ kịp phản ứng.</div>
+        </div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-icon">⚖️</div>
+        <div>
+          <div class="risk-title">Chrome Policy — Permissions quá rộng</div>
+          <div class="risk-desc">Extension cần đọc nội dung chat để index và search — điều này yêu cầu broad host permissions. Google review có thể từ chối hoặc yêu cầu giải thích.</div>
+          <div class="risk-mitigation">→ Mitigation: Xử lý hoàn toàn local, không gửi data đi đâu. Ghi rõ privacy policy. Xem cách Superpower ChatGPT implement để follow best practices.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="evidence-box">
+    <div class="ev-title">Verified Proof of Concept</div>
+    <div class="ev-name">Superpower ChatGPT</div>
+    <div class="ev-revenue">$20,000</div>
+    <div class="ev-period">/ tháng · 200,000+ users · 1 developer</div>
+    <div class="ev-desc">Saeed Ezzati build một mình, bắt đầu free 9 tháng, sau đó enable Pro tier. Revenue từ subscription + newsletter sponsorships. Không có funding, không có team.</div>
+  </div>
+
+  <div class="scard">
+    <div class="scard-title">📊 Key Metrics Overview</div>
+    <div class="kpi"><div class="kpi-l">Monetize Score</div><div class="kpi-v green">8.4 / 10</div></div>
+    <div class="kpi"><div class="kpi-l">Build time MVP</div><div class="kpi-v">4–6 tuần</div></div>
+    <div class="kpi"><div class="kpi-l">Chi phí ban đầu</div><div class="kpi-v green">~$0</div></div>
+    <div class="kpi"><div class="kpi-l">Chi phí vận hành/tháng</div><div class="kpi-v green">~$0</div></div>
+    <div class="kpi"><div class="kpi-l">Profit margin</div><div class="kpi-v green">85–95%</div></div>
+    <div class="kpi"><div class="kpi-l">Competitor threat</div><div class="kpi-v orange">Trung bình–Cao</div></div>
+    <div class="kpi"><div class="kpi-l">Platform risk</div><div class="kpi-v orange">Có, manageable</div></div>
+    <div class="kpi"><div class="kpi-l">Est. Year 1 revenue</div><div class="kpi-v green">$75K–$90K</div></div>
+  </div>
+
+  <div class="scard">
+    <div class="scard-title">✅ Next Actions — Làm ngay tuần này</div>
+    <ul class="action-list">
+      <li><div class="action-n">1</div>Tạo thư mục repo + đọc source code của Easy Folders (open inspect) để hiểu cách họ inject UI vào ChatGPT</li>
+      <li><div class="action-n">2</div>Join r/ChatGPT, r/ClaudeAI — đọc top complaints trong 6 tháng qua về "history", "organize", "find old chat"</li>
+      <li><div class="action-n">3</div>Build prototype folder tree chỉ cho ChatGPT trong 1 tuần. Không cần đẹp — cần work</li>
+      <li><div class="action-n">4</div>Lập danh sách 50 người trong network để làm beta tester tuần 3–4</li>
+      <li><div class="action-n">5</div>Setup ExtensionPay account — sẵn sàng nhận payment ngay khi launch</li>
+      <li><div class="action-n">6</div>Đăng ký waitlist trên Product Hunt để chuẩn bị launch</li>
+    </ul>
+  </div>
+
+  <div class="scard">
+    <div class="scard-title">🧭 Timeline Tóm Tắt</div>
+    <div class="roadmap" style="padding-left:4px">
+      <div class="rm-step">
+        <div class="rm-dot">W1</div>
+        <div class="rm-content">
+          <div class="rm-time">Tuần 1–2</div>
+          <h4>Research + Setup</h4>
+          <p>Đọc source đối thủ, setup repo, manifest V3 boilerplate</p>
+        </div>
+      </div>
+      <div class="rm-step">
+        <div class="rm-dot" style="border-color:var(--accent2);color:var(--accent2)">W3</div>
+        <div class="rm-content">
+          <div class="rm-time">Tuần 3–5</div>
+          <h4>Build MVP</h4>
+          <p>Folders + Search cho ChatGPT. Beta với 20–50 người</p>
+        </div>
+      </div>
+      <div class="rm-step">
+        <div class="rm-dot" style="border-color:var(--accent3);color:var(--accent3)">M2</div>
+        <div class="rm-content">
+          <div class="rm-time">Tháng 2</div>
+          <h4>Public Launch</h4>
+          <p>Product Hunt + Reddit. Claude support. Target 2K users</p>
+        </div>
+      </div>
+      <div class="rm-step">
+        <div class="rm-dot" style="border-color:var(--yellow);color:var(--yellow)">M4</div>
+        <div class="rm-content">
+          <div class="rm-time">Tháng 4</div>
+          <h4>Enable Pro Tier</h4>
+          <p>AI auto-tag + Export. ExtensionPay live. First $1K MRR</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+</div><!-- /body-wrap -->
+
+</body>
+</html>

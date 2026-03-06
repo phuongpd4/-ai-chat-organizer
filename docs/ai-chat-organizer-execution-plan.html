@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Execution Plan — AI Chat Organizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0c0e;
+  --surface: #141418;
+  --surface2: #1c1c22;
+  --surface3: #222228;
+  --border: #2a2a34;
+  --border2: #363644;
+  --text: #c8c8d8;
+  --muted: #606075;
+  --white: #eeeef8;
+
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,.12);
+  --green-border: rgba(34,197,94,.25);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,.1);
+  --amber-border: rgba(245,158,11,.25);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,.1);
+  --blue: #3b82f6;
+  --blue-dim: rgba(59,130,246,.1);
+  --blue-border: rgba(59,130,246,.25);
+  --purple: #a855f7;
+  --purple-dim: rgba(168,85,247,.1);
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+/* BG DOTS */
+body::before {
+  content:'';
+  position:fixed;inset:0;
+  background-image: radial-gradient(rgba(255,255,255,0.025) 1px,transparent 1px);
+  background-size:28px 28px;
+  pointer-events:none;z-index:0;
+}
+
+/* ── NAV ── */
+nav {
+  position: sticky;top:0;z-index:100;
+  background: rgba(12,12,14,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 48px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.nav-logo {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--white);
+  padding: 16px 0;
+  margin-right: 32px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nav-logo span { color: var(--green); }
+
+.nav-link {
+  padding: 18px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.nav-link:hover { color: var(--white); border-bottom-color: var(--border2); }
+.nav-link.active { color: var(--green); border-bottom-color: var(--green); }
+
+/* ── HERO ── */
+.hero {
+  position: relative; z-index:1;
+  max-width: 1100px; margin: 0 auto;
+  padding: 72px 48px 48px;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 48px;
+  align-items: start;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--green-dim);
+  border: 1px solid var(--green-border);
+  border-radius: 100px;
+  padding: 5px 14px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 24px;
+}
+
+.hero-badge::before { content:''; width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite; }
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2rem, 4.5vw, 3.6rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: var(--white);
+  margin-bottom: 20px;
+}
+
+h1 .dim { color: var(--muted); font-weight: 300; }
+h1 .accent { color: var(--green); }
+
+.hero-sub {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1.15rem;
+  color: var(--muted);
+  max-width: 500px;
+  line-height: 1.7;
+  margin-bottom: 32px;
+}
+
+.profile-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 12px; color: var(--text);
+}
+.profile-tag .dot { width:8px;height:8px;border-radius:50%; }
+
+/* SCORE CARD */
+.score-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  align-self: start;
+  margin-top: 8px;
+}
+
+.sc-head {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sc-body { padding: 24px; }
+
+.score-big {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 5rem;
+  font-weight: 600;
+  color: var(--green);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.score-label { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 20px; }
+
+.score-row { display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border); }
+.score-row:last-child { border:none; }
+.score-row .lbl { font-size:12px;color:var(--muted); }
+.score-row .val { font-family:'Space Mono',monospace;font-size:11px;font-weight:700; }
+.val-g{color:var(--green)}.val-a{color:var(--amber)}.val-r{color:var(--red)}
+
+/* ── MAIN LAYOUT ── */
+.main-wrap {
+  position:relative;z-index:1;
+  max-width:1100px;margin:0 auto;
+  padding:0 48px 80px;
+  display:grid;
+  grid-template-columns:1fr 300px;
+  gap:48px;
+  align-items:start;
+}
+
+/* ── SECTIONS ── */
+.section { margin-bottom:56px; scroll-margin-top:60px; }
+
+.sec-header {
+  display:flex;align-items:center;gap:14px;
+  margin-bottom:24px;
+  padding-bottom:14px;
+  border-bottom:1px solid var(--border);
+}
+
+.sec-tag {
+  font-family:'Space Mono',monospace;
+  font-size:9px;letter-spacing:0.25em;text-transform:uppercase;
+  color:var(--muted);
+}
+
+.sec-title {
+  font-size:1.3rem;font-weight:700;
+  color:var(--white);letter-spacing:-0.02em;
+}
+
+.sec-badge {
+  margin-left:auto;
+  font-size:10px;font-weight:700;
+  padding:3px 10px;border-radius:100px;
+  letter-spacing:0.06em;
+}
+.sb-new{background:var(--green-dim);color:var(--green);border:1px solid var(--green-border);}
+.sb-key{background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber-border);}
+.sb-tech{background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue-border);}
+
+/* CODE BLOCKS */
+.code-block {
+  background: #0a0a0c;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 16px 0;
+  font-family: 'Space Mono', monospace;
+}
+
+.code-bar {
+  padding: 10px 16px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  font-size: 10px; letter-spacing: 0.1em; color: var(--muted);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.code-dots { display:flex;gap:5px; }
+.code-dots span { width:8px;height:8px;border-radius:50%; }
+.dot-r{background:#ff5f56}.dot-y{background:#ffbd2e}.dot-g{background:#27c93f}
+
+.code-content {
+  padding: 16px 20px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #a8b8d8;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.code-content .cm { color: #4a5060; }
+.code-content .ck { color: #82aaff; }
+.code-content .cs { color: #c3e88d; }
+.code-content .cv { color: #f78c6c; }
+.code-content .cc { color: var(--green); }
+
+/* COPY BTN */
+.copy-btn {
+  background: var(--surface3); color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 0.1em;
+  cursor: pointer; transition: all .2s;
+}
+.copy-btn:hover { color: var(--green); border-color: var(--green-border); }
+.copy-btn.copied { color: var(--green); border-color: var(--green-border); background: var(--green-dim); }
+
+/* STEP CARDS */
+.steps { display:flex;flex-direction:column;gap:16px; }
+
+.step-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 16px;
+  align-items: start;
+  transition: border-color .2s;
+}
+.step-card:hover { border-color: var(--border2); }
+
+.step-num {
+  width:40px;height:40px;flex-shrink:0;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;
+  font-size:0.8rem;font-weight:700;
+  color:var(--muted);
+}
+
+.step-card.active .step-num { background:var(--green-dim);border-color:var(--green-border);color:var(--green); }
+
+.step-content {}
+.step-time { font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--amber);margin-bottom:4px; }
+.step-title { font-size:0.95rem;font-weight:700;color:var(--white);margin-bottom:6px; }
+.step-desc { font-size:13px;color:var(--muted);line-height:1.65; }
+
+/* FEATURE TABLE */
+.feat-phases { display:flex;flex-direction:column;gap:12px; }
+
+.phase-block {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.phase-head {
+  padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.phase-head-left { display:flex;align-items:center;gap:12px; }
+.phase-tag { font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;padding:3px 9px;border-radius:100px; }
+.phase-name { font-size:0.9rem;font-weight:700;color:var(--white); }
+.phase-time { font-size:11px;color:var(--muted); }
+.phase-arrow { font-size:0.7rem;color:var(--muted);transition:transform .2s; }
+.phase-block.open .phase-arrow { transform:rotate(180deg); }
+
+.phase-body {
+  display: none;
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--border);
+}
+.phase-block.open .phase-body { display: block; padding-top: 16px; }
+
+.feat-list { list-style:none;display:flex;flex-direction:column;gap:8px; }
+.feat-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; color: var(--text); padding: 10px 12px;
+  background: var(--surface2); border-radius: 8px;
+  line-height: 1.5;
+}
+
+.feat-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+.feat-text { flex: 1; }
+.feat-text strong { color: var(--white); display:block;font-size:0.88rem;margin-bottom:2px; }
+.feat-text span { color:var(--muted);font-size:12px; }
+
+.feat-pill { margin-left:auto; font-size:9px;font-weight:700;padding:2px 8px;border-radius:100px;white-space:nowrap;flex-shrink:0; }
+.pill-free { background:var(--green-dim);color:var(--green);border:1px solid var(--green-border); }
+.pill-pro  { background:var(--purple-dim);color:var(--purple);border:1px solid rgba(168,85,247,.25); }
+.pill-team { background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue-border); }
+
+/* COMPETITOR TABLE */
+.ctable { width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:12px;overflow:hidden;font-size:12.5px; }
+.ctable th { background:var(--surface2);padding:11px 16px;text-align:left;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500; }
+.ctable td { padding:13px 16px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text); }
+.ctable tr:last-child td{border-bottom:none;}
+.ctable tr:hover td{background:var(--surface2);}
+.cn{font-weight:700;color:var(--white);font-size:0.88rem;}
+.ctag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;margin-top:3px;}
+.t-r{background:var(--red-dim);color:var(--red);}
+.t-a{background:var(--amber-dim);color:var(--amber);}
+.t-g{background:var(--green-dim);color:var(--green);}
+.gap-text{color:var(--green);font-size:11.5px;font-weight:600;}
+
+/* PRICING CARDS */
+.pricing { display:grid;grid-template-columns:repeat(3,1fr);gap:14px; }
+
+.pcard {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:24px;
+  position:relative;
+  text-align:center;
+  transition:border-color .2s;
+}
+.pcard:hover{border-color:var(--border2);}
+.pcard.hot{border-color:var(--green-border);background:var(--surface2);}
+
+.hot-badge {
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  background:var(--green);color:var(--bg);
+  font-size:9px;font-weight:800;letter-spacing:0.15em;
+  padding:4px 12px;border-radius:100px;
+  white-space:nowrap;
+}
+
+.p-tier { font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.25em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:block; }
+.p-price { font-family:'Cormorant Garamond',serif;font-size:3rem;font-weight:600;color:var(--white);line-height:1;margin-bottom:3px; }
+.p-price .unit { font-size:1rem;color:var(--muted); }
+.p-period { font-size:11px;color:var(--muted);margin-bottom:18px;display:block; }
+
+.pcard ul { list-style:none;text-align:left;margin-bottom:18px; }
+.pcard li { font-size:12px;padding:6px 0;color:var(--text);display:flex;gap:8px;border-bottom:1px solid var(--border);line-height:1.5; }
+.pcard li::before{content:'→';color:var(--green);font-weight:800;flex-shrink:0;}
+.pcard.hot li{border-bottom-color:var(--border2);}
+
+.p-cta { width:100%;padding:10px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;font-family:'Space Grotesk',sans-serif;border:1px solid var(--border);background:var(--surface3);color:var(--text); }
+.pcard.hot .p-cta{background:var(--green);color:var(--bg);border-color:var(--green);}
+
+/* REVENUE TABLE */
+.rtable{width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:12px;overflow:hidden;font-size:12.5px;}
+.rtable th{background:var(--surface2);padding:11px 16px;text-align:left;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;}
+.rtable td{padding:13px 16px;border-bottom:1px solid var(--border);color:var(--text);}
+.rtable tr:last-child td{border-bottom:none;background:var(--surface2);}
+.rtable tr:last-child td:first-child{color:var(--white);font-weight:700;}
+.rnum{font-family:'Space Mono',monospace;color:var(--green);font-weight:700;}
+.rnum.big{font-size:1.1rem;}
+.rtable tfoot td{background:rgba(34,197,94,.06);border-top:1px solid var(--green-border);color:var(--white);font-weight:700;}
+.rtable tfoot .rnum{color:var(--green);font-size:1.1rem;}
+
+/* MARKETING */
+.ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.ch-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;transition:border-color .2s;}
+.ch-card:hover{border-color:var(--border2);}
+.ch-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.ch-name{font-size:0.88rem;font-weight:700;color:var(--white);}
+.eff-badge{font-size:9px;font-weight:700;padding:3px 8px;border-radius:100px;letter-spacing:0.06em;}
+.eff-low{background:var(--green-dim);color:var(--green);border:1px solid var(--green-border);}
+.eff-med{background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber-border);}
+.ch-desc{font-size:12.5px;color:var(--muted);line-height:1.65;}
+.ch-action{margin-top:10px;font-size:11.5px;color:var(--green);font-weight:600;}
+
+/* RISK */
+.risk-grid{display:flex;flex-direction:column;gap:12px;}
+.risk-item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;display:flex;gap:14px;}
+.ri-icon{font-size:1.3rem;flex-shrink:0;margin-top:2px;}
+.ri-title{font-size:0.9rem;font-weight:700;color:var(--white);margin-bottom:4px;}
+.ri-desc{font-size:12.5px;color:var(--muted);line-height:1.6;}
+.ri-fix{font-size:11.5px;color:var(--green);font-weight:600;margin-top:6px;}
+
+/* SIDEBAR */
+.sidebar{position:sticky;top:70px;}
+
+.scard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:16px;}
+
+.scard-title{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.28em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+
+.kpi{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px dotted var(--border);}
+.kpi:last-child{border:none;}
+.kpi-l{font-size:11.5px;color:var(--muted);}
+.kpi-v{font-family:'Space Mono',monospace;font-size:0.85rem;font-weight:700;}
+.kg{color:var(--green)}.ka{color:var(--amber)}.kr{color:var(--red)}
+
+.action-items{list-style:none;display:flex;flex-direction:column;gap:8px;}
+.ai-item{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);font-size:12.5px;line-height:1.5;color:var(--text);transition:border-color .2s;}
+.ai-item:hover{border-color:var(--green-border);}
+.ai-num{width:20px;height:20px;flex-shrink:0;background:var(--green-dim);border:1px solid var(--green-border);border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:700;color:var(--green);margin-top:1px;}
+
+.evidence{background:linear-gradient(135deg,rgba(34,197,94,.06),rgba(34,197,94,.02));border:1px solid var(--green-border);border-radius:14px;padding:22px;margin-bottom:16px;}
+.ev-label{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:0.25em;text-transform:uppercase;color:rgba(34,197,94,.5);margin-bottom:12px;}
+.ev-name{font-size:0.9rem;font-weight:700;color:var(--white);margin-bottom:2px;}
+.ev-rev{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:600;color:var(--green);line-height:1;margin-bottom:3px;}
+.ev-period{font-size:11px;color:rgba(34,197,94,.5);margin-bottom:12px;}
+.ev-desc{font-size:12px;color:var(--muted);line-height:1.65;}
+
+/* RESPONSIVE */
+@media(max-width:880px){
+  nav{padding:0 20px;}
+  .hero,.main-wrap{grid-template-columns:1fr;padding-left:20px;padding-right:20px;}
+  .pricing,.ch-grid{grid-template-columns:1fr;}
+  .sidebar{position:static;}
+  h1{font-size:2rem;}
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">AI<span>Chat</span>Org</div>
+  <a href="#overview" class="nav-link active">Overview</a>
+  <a href="#competitors" class="nav-link">Đối thủ</a>
+  <a href="#features" class="nav-link">Features</a>
+  <a href="#tech" class="nav-link">Tech Stack</a>
+  <a href="#pricing" class="nav-link">Pricing</a>
+  <a href="#revenue" class="nav-link">Revenue</a>
+  <a href="#marketing" class="nav-link">Marketing</a>
+  <a href="#risks" class="nav-link">Rủi ro</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero" id="overview">
+  <div>
+    <div class="hero-badge">Execution Plan · Dành cho Code Agent Developer</div>
+    <h1>
+      AI Chat Organizer<br>
+      <span class="dim">từ $0 đến</span> <span class="accent">$10K/tháng</span>
+    </h1>
+    <p class="hero-sub">
+      Kế hoạch thực thi cá nhân hoá — tập trung vào revenue nhanh và passive income dài hạn. Mọi lệnh CLI và prompt code agent đều có sẵn.
+    </p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div class="profile-tag"><div class="dot" style="background:var(--blue)"></div>Stack: Cursor/Claude Code + React + Vite + MV3</div>
+      <div class="profile-tag"><div class="dot" style="background:var(--green)"></div>Timeline: Revenue trong 60 ngày</div>
+    </div>
+  </div>
+
+  <div class="score-card">
+    <div class="sc-head">Đánh giá cơ hội</div>
+    <div class="sc-body">
+      <div class="score-big">8.4</div>
+      <div class="score-label">/ 10 · Monetize score</div>
+      <div class="score-row"><div class="lbl">Market size</div><div class="val val-g">800M users</div></div>
+      <div class="score-row"><div class="lbl">Build time MVP</div><div class="val val-g">4–5 tuần</div></div>
+      <div class="score-row"><div class="lbl">Server cost</div><div class="val val-g">$0 / tháng</div></div>
+      <div class="score-row"><div class="lbl">Margin</div><div class="val val-g">90–95%</div></div>
+      <div class="score-row"><div class="lbl">Competition</div><div class="val val-a">Trung bình</div></div>
+      <div class="score-row"><div class="lbl">Revenue year 1</div><div class="val val-g">$75K–$90K</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN WRAP -->
+<div class="main-wrap">
+<div class="main-col">
+
+<!-- ── 01 COMPETITORS ── -->
+<div class="section" id="competitors">
+  <div class="sec-header">
+    <span class="sec-tag">01</span>
+    <h2 class="sec-title">Đối thủ & Khoảng trống</h2>
+    <span class="sec-badge sb-key">Critical</span>
+  </div>
+
+  <p style="margin-bottom:16px;color:var(--muted);">Đây là thông tin anh cần biết trước khi viết dòng code đầu tiên — để không build cái người khác đã làm tốt hơn.</p>
+
+  <table class="ctable">
+    <thead>
+      <tr>
+        <th>Extension</th>
+        <th>Users</th>
+        <th>Giá</th>
+        <th>Điểm yếu cụ thể</th>
+        <th>Anh tấn công vào đây</th>
+        <th>Threat</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="cn">Superpower ChatGPT</div>
+          <div class="ctag t-r" style="margin-top:4px">Đối thủ chính</div>
+        </td>
+        <td>200K+</td>
+        <td>Free + Pro subscription</td>
+        <td style="font-size:12px;color:var(--muted);">Chỉ có ChatGPT. UI nhồi nhét 30+ features. Không hỗ trợ Claude.ai hay Gemini. Onboarding phức tạp cho user mới.</td>
+        <td class="gap-text">→ Multi-platform (ChatGPT + Claude + Gemini)<br>→ UX tối giản, onboarding trong 30 giây</td>
+        <td><span class="ctag t-r">Cao</span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="cn">Easy Folders</div>
+          <div class="ctag t-a" style="margin-top:4px">$3.7K/tháng</div>
+        </td>
+        <td>~50K</td>
+        <td>$3.99–$7.99/tháng</td>
+        <td style="font-size:12px;color:var(--muted);">Chỉ folders, không có smart search, không AI tagging, không export. ChatGPT và Claude nhưng không có Gemini.</td>
+        <td class="gap-text">→ AI auto-tagging<br>→ Semantic search<br>→ Full export (Notion/MD/PDF)</td>
+        <td><span class="ctag t-a">Trung bình</span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="cn">Echoes</div>
+          <div class="ctag t-g" style="margin-top:4px">Nhiều bugs</div>
+        </td>
+        <td>~20K</td>
+        <td>Freemium</td>
+        <td style="font-size:12px;color:var(--muted);">Review: "buggy", "slow", developer ít active. Concept đúng nhưng execution kém. Đây là khoảng trống rõ nhất.</td>
+        <td class="gap-text">→ Stable + fast = win ngay</td>
+        <td><span class="ctag t-g">Thấp</span></td>
+      </tr>
+      <tr>
+        <td>
+          <div class="cn">Native ChatGPT</div>
+          <div class="ctag t-a" style="margin-top:4px">Rủi ro dài hạn</div>
+        </td>
+        <td>800M</td>
+        <td>$20/tháng Plus</td>
+        <td style="font-size:12px;color:var(--muted);">Search rất yếu, không có folders, không export. OpenAI không có incentive để làm tốt điều này — focus vào model AI.</td>
+        <td class="gap-text">→ Extension bổ sung, không thay thế<br>→ Multi-platform là lá chắn</td>
+        <td><span class="ctag t-a">Tiềm ẩn</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:16px;padding:14px 18px;background:rgba(34,197,94,.05);border:1px solid var(--green-border);border-radius:10px;font-size:13px;">
+    <strong style="color:var(--green);">→ Winning formula:</strong> <span style="color:var(--muted);">ChatGPT + Claude + Gemini trong 1 extension · UX đơn giản hơn Superpower · AI auto-tag mà không ai có · Stable hơn Echoes. Đây là bộ 4 tiêu chí đủ để thắng.</span>
+  </div>
+</div>
+
+<!-- ── 02 FEATURES ── -->
+<div class="section" id="features">
+  <div class="sec-header">
+    <span class="sec-tag">02</span>
+    <h2 class="sec-title">Feature Roadmap — Build theo thứ tự này</h2>
+    <span class="sec-badge sb-new">Prioritized</span>
+  </div>
+
+  <p style="margin-bottom:20px;color:var(--muted);">Mỗi phase được lock — không được build phase sau trước khi phase trước có đủ user feedback. Đây là bài học số 1 từ Superpower ChatGPT.</p>
+
+  <div class="feat-phases">
+
+    <div class="phase-block open">
+      <div class="phase-head" onclick="togglePhase(this)">
+        <div class="phase-head-left">
+          <span class="phase-tag" style="background:var(--green-dim);color:var(--green);border:1px solid var(--green-border);">Phase 1</span>
+          <span class="phase-name">MVP · Tuần 1–4</span>
+          <span class="phase-time">— Build trước, revenue sau</span>
+        </div>
+        <span class="phase-arrow">▼</span>
+      </div>
+      <div class="phase-body">
+        <ul class="feat-list">
+          <li class="feat-item"><span class="feat-icon">📁</span><div class="feat-text"><strong>Folders & Subfolders</strong><span>Drag-and-drop, color coding, collapsible. ChatGPT sidebar first.</span></div><span class="feat-pill pill-free">Free</span></li>
+          <li class="feat-item"><span class="feat-icon">🔍</span><div class="feat-text"><strong>Full-text Search</strong><span>Fuse.js local search. Highlight results. Filter theo date/platform.</span></div><span class="feat-pill pill-free">Free</span></li>
+          <li class="feat-item"><span class="feat-icon">📌</span><div class="feat-text"><strong>Pin & Bookmark</strong><span>Pin chat lên top. Bookmark message trong conversation dài.</span></div><span class="feat-pill pill-free">Free</span></li>
+          <li class="feat-item"><span class="feat-icon">⏱️</span><div class="feat-text"><strong>Timestamps</strong><span>Hiển thị thời gian tạo / cập nhật cho mỗi chat. Quick win, dễ build.</span></div><span class="feat-pill pill-free">Free</span></li>
+          <li class="feat-item"><span class="feat-icon">🌐</span><div class="feat-text"><strong>Claude.ai Support</strong><span>Inject UI vào claude.ai — cùng folder system. Differentiator ngay từ launch.</span></div><span class="feat-pill pill-free">Free</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-block">
+      <div class="phase-head" onclick="togglePhase(this)">
+        <div class="phase-head-left">
+          <span class="phase-tag" style="background:var(--purple-dim);color:var(--purple);border:1px solid rgba(168,85,247,.25);">Phase 2</span>
+          <span class="phase-name">Pro Features · Tháng 2–3</span>
+          <span class="phase-time">— Bắt đầu charge</span>
+        </div>
+        <span class="phase-arrow">▼</span>
+      </div>
+      <div class="phase-body">
+        <ul class="feat-list">
+          <li class="feat-item"><span class="feat-icon">🤖</span><div class="feat-text"><strong>AI Auto-Tag (Killer Feature)</strong><span>Dùng Claude Haiku API để auto-tag conversation: "coding", "writing", "research". User cung cấp API key → cost = $0 cho anh.</span></div><span class="feat-pill pill-pro">Pro</span></li>
+          <li class="feat-item"><span class="feat-icon">📤</span><div class="feat-text"><strong>Export Hub</strong><span>Export sang Markdown, PDF, Notion API. Bulk export. Đây là feature user sẵn sàng trả tiền nhất.</span></div><span class="feat-pill pill-pro">Pro</span></li>
+          <li class="feat-item"><span class="feat-icon">🔮</span><div class="feat-text"><strong>Gemini Support</strong><span>Inject vào gemini.google.com. Tăng TAM thêm 50%+.</span></div><span class="feat-pill pill-pro">Pro</span></li>
+          <li class="feat-item"><span class="feat-icon">📊</span><div class="feat-text"><strong>Usage Dashboard</strong><span>Stats: chat nhiều nhất với topic gì, AI tool nào dùng nhiều nhất, productivity trends.</span></div><span class="feat-pill pill-pro">Pro</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-block">
+      <div class="phase-head" onclick="togglePhase(this)">
+        <div class="phase-head-left">
+          <span class="phase-tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid var(--blue-border);">Phase 3</span>
+          <span class="phase-name">Team Tier · Tháng 5+</span>
+          <span class="phase-time">— B2B revenue stream</span>
+        </div>
+        <span class="phase-arrow">▼</span>
+      </div>
+      <div class="phase-body">
+        <ul class="feat-list">
+          <li class="feat-item"><span class="feat-icon">👥</span><div class="feat-text"><strong>Shared Workspaces</strong><span>Team folder, share chat với đồng nghiệp, collaborative tagging.</span></div><span class="feat-pill pill-team">Team</span></li>
+          <li class="feat-item"><span class="feat-icon">📚</span><div class="feat-text"><strong>Team Prompt Library</strong><span>Lưu và share prompts trong team. Version control. Ai cũng dùng cùng system prompts.</span></div><span class="feat-pill pill-team">Team</span></li>
+          <li class="feat-item"><span class="feat-icon">📈</span><div class="feat-text"><strong>Admin Dashboard</strong><span>Manager xem team dùng AI tool như thế nào, productivity metrics. B2B selling point.</span></div><span class="feat-pill pill-team">Team</span></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 03 TECH STACK ── -->
+<div class="section" id="tech">
+  <div class="sec-header">
+    <span class="sec-tag">03</span>
+    <h2 class="sec-title">Tech Stack & Setup — Copy & Chạy</h2>
+    <span class="sec-badge sb-tech">Code-Agent Ready</span>
+  </div>
+
+  <p style="margin-bottom:16px;color:var(--muted);">Stack được chọn để tối ưu cho workflow code agent (Cursor/Claude Code). Boilerplate đã có sẵn — không cần setup từ đầu.</p>
+
+  <div class="code-block">
+    <div class="code-bar">
+      <div style="display:flex;align-items:center;gap:8px;"><div class="code-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div><span>Terminal · Bước 1: Bootstrap project trong 2 phút</span></div>
+      <button class="copy-btn" onclick="copyCode(this,'cmd1')">Copy</button>
+    </div>
+    <div class="code-content" id="cmd1"><span class="cm"># Clone boilerplate tốt nhất cho MV3 + React + Vite</span>
+<span class="ck">git</span> <span class="cs">clone</span> https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite
+<span class="ck">cd</span> chrome-extension-boilerplate-react-vite
+<span class="ck">pnpm</span> install
+
+<span class="cm"># Rename project</span>
+<span class="cm"># Sửa manifest.json: name, description, permissions</span>
+<span class="cm"># Permissions cần: "storage", "scripting", "activeTab"</span>
+<span class="cm"># Host permissions: "https://chatgpt.com/*", "https://claude.ai/*", "https://gemini.google.com/*"</span>
+
+<span class="cm"># Dev mode với HMR</span>
+<span class="ck">pnpm</span> dev
+
+<span class="cm"># Build production</span>
+<span class="ck">pnpm</span> build
+<span class="ck">pnpm</span> zip   <span class="cm"># → dist-zip/extension-YYYYMMDD.zip</span></div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-bar">
+      <div style="display:flex;align-items:center;gap:8px;"><div class="code-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div><span>manifest.json · Core permissions cho multi-platform</span></div>
+      <button class="copy-btn" onclick="copyCode(this,'cmd2')">Copy</button>
+    </div>
+    <div class="code-content" id="cmd2">{
+  <span class="cs">"manifest_version"</span>: <span class="cv">3</span>,
+  <span class="cs">"name"</span>: <span class="cs">"AI Chat Organizer"</span>,
+  <span class="cs">"version"</span>: <span class="cs">"1.0.0"</span>,
+  <span class="cs">"permissions"</span>: [<span class="cs">"storage"</span>, <span class="cs">"scripting"</span>, <span class="cs">"activeTab"</span>, <span class="cs">"sidePanel"</span>],
+  <span class="cs">"host_permissions"</span>: [
+    <span class="cs">"https://chatgpt.com/*"</span>,
+    <span class="cs">"https://claude.ai/*"</span>,
+    <span class="cs">"https://gemini.google.com/*"</span>
+  ],
+  <span class="cs">"content_scripts"</span>: [
+    {
+      <span class="cs">"matches"</span>: [<span class="cs">"https://chatgpt.com/*"</span>, <span class="cs">"https://claude.ai/*"</span>],
+      <span class="cs">"js"</span>: [<span class="cs">"content/index.js"</span>],
+      <span class="cs">"css"</span>: [<span class="cs">"content/style.css"</span>],
+      <span class="cs">"run_at"</span>: <span class="cs">"document_idle"</span>
+    }
+  ],
+  <span class="cs">"side_panel"</span>: { <span class="cs">"default_path"</span>: <span class="cs">"side-panel/index.html"</span> },
+  <span class="cs">"background"</span>: { <span class="cs">"service_worker"</span>: <span class="cs">"background.js"</span>, <span class="cs">"type"</span>: <span class="cs">"module"</span> }
+}</div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-bar">
+      <div style="display:flex;align-items:center;gap:8px;"><div class="code-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div><span>Cursor Prompt · Dùng cái này để code agent build folder feature</span></div>
+      <button class="copy-btn" onclick="copyCode(this,'cmd3')">Copy</button>
+    </div>
+    <div class="code-content" id="cmd3"><span class="cm">## Prompt cho Cursor/Claude Code — Paste vào chat</span>
+
+Build a Chrome extension content script that injects a folder sidebar
+into chatgpt.com. Requirements:
+
+1. Inject a collapsible sidebar on the LEFT of the existing ChatGPT sidebar
+2. React component using Shadow DOM (to avoid CSS conflicts with ChatGPT)
+3. Features needed:
+   - Create/rename/delete folders with color picker
+   - Drag and drop chats from ChatGPT sidebar into folders
+   - MutationObserver to watch for new chats being added
+   - Persist folder structure to chrome.storage.sync
+   - Collapse/expand folders
+4. Use TypeScript, Tailwind CSS inside Shadow DOM
+5. Handle SPA navigation (ChatGPT uses React Router — sidebar re-renders)
+6. Must work with Manifest V3 (no eval, no remote code)
+
+The ChatGPT sidebar chat list items have this structure:
+[inspect chatgpt.com and paste the actual DOM structure here]
+
+Start with the FolderTree component and the storage utilities.</div>
+  </div>
+
+  <div style="margin-top:16px;padding:14px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--muted);">
+    <strong style="color:var(--amber);">⚠️ Trick quan trọng nhất:</strong> Dùng <strong style="color:var(--white);">Shadow DOM</strong> để inject UI — CSS của extension không bị conflict với CSS của ChatGPT/Claude. Đây là cách Superpower ChatGPT làm. Nếu không dùng Shadow DOM, UI sẽ bị vỡ khi ChatGPT update CSS của họ.
+  </div>
+</div>
+
+<!-- ── 04 PRICING ── -->
+<div class="section" id="pricing">
+  <div class="sec-header">
+    <span class="sec-tag">04</span>
+    <h2 class="sec-title">Pricing Strategy — Tối ưu cho revenue nhanh</h2>
+    <span class="sec-badge sb-key">Revenue Focus</span>
+  </div>
+
+  <p style="margin-bottom:20px;color:var(--muted);">Với mục tiêu revenue nhanh: <strong style="color:var(--white);">Lifetime Deal tháng đầu</strong> để có cash flow ngay lập tức. Sau đó chuyển sang recurring subscription.</p>
+
+  <div class="pricing">
+    <div class="pcard">
+      <span class="p-tier">Free Forever</span>
+      <div class="p-price">$0</div>
+      <span class="p-period">Build user base</span>
+      <ul>
+        <li>Folders không giới hạn</li>
+        <li>Full-text search</li>
+        <li>Pin 10 chats</li>
+        <li>ChatGPT + Claude</li>
+        <li>Chrome sync</li>
+      </ul>
+      <button class="p-cta">Default khi install</button>
+    </div>
+
+    <div class="pcard hot">
+      <div class="hot-badge">Tháng 1: Lifetime $39</div>
+      <span class="p-tier">Pro · Launch Offer</span>
+      <div class="p-price">$5<span class="unit">.99</span></div>
+      <span class="p-period">/ tháng · $48/năm (–33%)</span>
+      <ul>
+        <li>AI Auto-tagging</li>
+        <li>Export Notion/MD/PDF</li>
+        <li>Gemini support</li>
+        <li>Bulk actions</li>
+        <li>Usage analytics</li>
+        <li>Priority support</li>
+      </ul>
+      <button class="p-cta">Core revenue stream</button>
+    </div>
+
+    <div class="pcard">
+      <span class="p-tier">Team · Tháng 5+</span>
+      <div class="p-price">$12</div>
+      <span class="p-period">/ user / tháng · min 3</span>
+      <ul>
+        <li>All Pro features</li>
+        <li>Shared workspaces</li>
+        <li>Prompt library</li>
+        <li>Admin dashboard</li>
+        <li>Centralized billing</li>
+      </ul>
+      <button class="p-cta">Phase 3 launch</button>
+    </div>
+  </div>
+
+  <div class="code-block" style="margin-top:20px;">
+    <div class="code-bar">
+      <div style="display:flex;align-items:center;gap:8px;"><div class="code-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div><span>Terminal · Setup ExtensionPay — Nhận payment trong 30 phút</span></div>
+      <button class="copy-btn" onclick="copyCode(this,'cmd4')">Copy</button>
+    </div>
+    <div class="code-content" id="cmd4"><span class="cm"># ExtensionPay: open-source Stripe payment cho extension</span>
+<span class="cm"># Không cần backend code — toàn bộ handle bởi extension + Stripe</span>
+<span class="cm"># Docs: https://extensionpay.com</span>
+
+<span class="ck">npm</span> install extensionpay
+
+<span class="cm"># Trong background.js:</span>
+<span class="ck">import</span> ExtPay <span class="ck">from</span> <span class="cs">'extensionpay'</span>
+<span class="ck">const</span> extpay = ExtPay(<span class="cs">'your-unique-extension-id'</span>)
+extpay.startBackground()
+
+<span class="cm"># Trong popup/content script:</span>
+<span class="ck">const</span> user = <span class="ck">await</span> extpay.getUser()
+<span class="ck">if</span> (!user.paid) {
+  extpay.openPaymentPage()  <span class="cm">// Mở Stripe checkout</span>
+}
+
+<span class="cm"># Xong. Stripe dashboard để theo dõi revenue.</span>
+<span class="cm"># ExtensionPay lấy 10% fee — acceptable cho indie developer</span></div>
+  </div>
+</div>
+
+<!-- ── 05 REVENUE PROJECTION ── -->
+<div class="section" id="revenue">
+  <div class="sec-header">
+    <span class="sec-tag">05</span>
+    <h2 class="sec-title">Revenue Projection — 12 tháng thực tế</h2>
+  </div>
+
+  <table class="rtable">
+    <thead>
+      <tr>
+        <th>Giai đoạn</th>
+        <th>Users (Free)</th>
+        <th>Pro Subs (3%)</th>
+        <th>MRR Subs</th>
+        <th>One-time / Extras</th>
+        <th>Total / tháng</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong style="color:var(--white)">Tháng 1</strong><br><small style="color:var(--muted)">Launch + Lifetime Deal</small></td>
+        <td>500–2K</td>
+        <td>—</td>
+        <td>$0</td>
+        <td class="rnum">$2,340<br><small style="color:var(--muted);font-size:11px">60 lifetime × $39</small></td>
+        <td class="rnum">~$2,340</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--white)">Tháng 2–3</strong><br><small style="color:var(--muted)">Enable Pro tier</small></td>
+        <td>5K</td>
+        <td>150</td>
+        <td>$898</td>
+        <td class="rnum">$780<br><small style="color:var(--muted);font-size:11px">20 lifetime còn lại</small></td>
+        <td class="rnum">~$1,678</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--white)">Tháng 4–5</strong><br><small style="color:var(--muted)">Growth phase</small></td>
+        <td>15K</td>
+        <td>450</td>
+        <td>$2,696</td>
+        <td class="rnum">$500<br><small style="color:var(--muted);font-size:11px">Newsletter sponsors</small></td>
+        <td class="rnum">~$3,196</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--white)">Tháng 6–8</strong><br><small style="color:var(--muted)">Scale</small></td>
+        <td>35K</td>
+        <td>1,050</td>
+        <td>$6,290</td>
+        <td class="rnum">$1,000<br><small style="color:var(--muted);font-size:11px">Sponsors + affiliates</small></td>
+        <td class="rnum">~$7,290</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--white)">Tháng 9–12</strong><br><small style="color:var(--muted)">Compound + Team</small></td>
+        <td>60K</td>
+        <td>1,800 + 20 teams</td>
+        <td>$10,782 + $720</td>
+        <td class="rnum">$1,000</td>
+        <td class="rnum big">~$12,502</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5">💰 Tổng Year 1 (conservative 3% conversion)</td>
+        <td class="rnum big">~$75K–$90K</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <p style="margin-top:12px;font-size:12px;color:var(--muted);">* Dựa trên Superpower ChatGPT ($20K/tháng ở 200K users = 10% conversion) và Easy Folders ($3.7K/tháng ở 50K users = 1.25% conversion). Projection dùng 3% conservative. Passive income bắt đầu từ tháng 4 trở đi — subscription recurs tự động.</p>
+</div>
+
+<!-- ── 06 MARKETING ── -->
+<div class="section" id="marketing">
+  <div class="sec-header">
+    <span class="sec-tag">06</span>
+    <h2 class="sec-title">Marketing & Launch Plan — Không dùng paid ads</h2>
+    <span class="sec-badge sb-new">Organic Only</span>
+  </div>
+
+  <p style="margin-bottom:20px;color:var(--muted);">Superpower ChatGPT đạt 200K users hoàn toàn organic. Đây là playbook đã verified — không tốn tiền quảng cáo.</p>
+
+  <div class="ch-grid">
+
+    <div class="ch-card">
+      <div class="ch-top">
+        <div class="ch-name">🔴 Reddit — Launch channel</div>
+        <span class="eff-badge eff-low">Cao nhất ROI</span>
+      </div>
+      <div class="ch-desc">r/ChatGPT (7M), r/ClaudeAI (500K), r/AITools (300K). Post "Show Reddit" — không spam link, genuine engagement. 1 post viral = 2,000–5,000 installs.</div>
+      <div class="ch-action">→ Post ngay sau khi launch Chrome Store</div>
+    </div>
+
+    <div class="ch-card">
+      <div class="ch-top">
+        <div class="ch-name">🐦 Twitter/X Build in Public</div>
+        <span class="eff-badge eff-low">Low effort</span>
+      </div>
+      <div class="ch-desc">Tweet mỗi milestone: "Vừa hit 100 users", "First $100 MRR", "$1K MRR 🎉". AI Twitter rất supportive. GIF demo ngắn 30 giây = viral potential cao.</div>
+      <div class="ch-action">→ Bắt đầu từ ngày build, không phải ngày launch</div>
+    </div>
+
+    <div class="ch-card">
+      <div class="ch-top">
+        <div class="ch-name">🚀 Product Hunt</div>
+        <span class="eff-badge eff-med">Cần chuẩn bị</span>
+      </div>
+      <div class="ch-desc">Chuẩn bị 2 tuần: GIF demo đẹp, tagline ngắn, 20+ beta users sẵn sàng upvote ngay khi launch. Top 5 = 1,000–3,000 installs trong 48h.</div>
+      <div class="ch-action">→ Schedule launch khi đã có 200+ installs từ Reddit trước</div>
+    </div>
+
+    <div class="ch-card">
+      <div class="ch-top">
+        <div class="ch-name">📧 Newsletter + Lifetime Deal</div>
+        <span class="eff-badge eff-low">Revenue ngay</span>
+      </div>
+      <div class="ch-desc">Collect email từ ngày đầu (inline trong extension). Khi có 500 subscribers, email Lifetime Deal $39 — đây là cách kiếm $2,000+ đầu tiên trước khi có subscription revenue.</div>
+      <div class="ch-action">→ Setup Beehiiv (free) trước khi launch</div>
+    </div>
+
+    <div class="ch-card">
+      <div class="ch-top">
+        <div class="ch-name">🎥 YouTube — 1 video</div>
+        <span class="eff-badge eff-med">Long-term traffic</span>
+      </div>
+      <div class="ch-desc">"How to organize ChatGPT conversations" — keyword cao, ít video chất lượng. Screencast 5 phút. 1 video tốt = 200–500 installs/tháng passively forever.</div>
+      <div class="ch-action">→ Làm sau khi có 500 users đầu tiên</div>
+    </div>
+
+    <div class="ch-card">
+      <div class="ch-top">
+        <div class="ch-name">🤝 AppSumo (Tháng 3)</div>
+        <span class="eff-badge eff-med">Lump-sum cash</span>
+      </div>
+      <div class="ch-desc">List Lifetime Deal $49 trên AppSumo khi product stable. 100K+ software buyers. Target 200 deals = $9,800 lump sum. Dùng để fund development phase 2.</div>
+      <div class="ch-action">→ Apply sau khi có 1,000+ reviews tốt trên Chrome Store</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 07 RISKS ── -->
+<div class="section" id="risks">
+  <div class="sec-header">
+    <span class="sec-tag">07</span>
+    <h2 class="sec-title">Rủi ro & Cách xử lý</h2>
+  </div>
+
+  <div class="risk-grid">
+    <div class="risk-item">
+      <div class="ri-icon">🔄</div>
+      <div>
+        <div class="ri-title">ChatGPT thay đổi DOM — Extension bị break</div>
+        <div class="ri-desc">Rủi ro #1. OpenAI update UI thường xuyên, DOM selectors thay đổi. Superpower ChatGPT đã bị break nhiều lần. Users sẽ leave 1-star review ngay lập tức.</div>
+        <div class="ri-fix">→ Fix: Abstract tất cả selectors vào 1 file config. Setup Playwright monitor chạy hàng ngày — alert khi DOM thay đổi. Commit để fix trong vòng 24h. Đây là competitive moat: respond nhanh hơn Superpower.</div>
+      </div>
+    </div>
+    <div class="risk-item">
+      <div class="ri-icon">🏢</div>
+      <div>
+        <div class="ri-title">OpenAI native-build folders/search</div>
+        <div class="ri-desc">Nếu OpenAI build tính năng này vào ChatGPT Plus, extension mất giá trị với ChatGPT users. Xác suất thấp trong 12 tháng — họ focus vào model AI, không UX.</div>
+        <div class="ri-fix">→ Fix: Multi-platform từ tháng 1 (Claude.ai). Nếu ChatGPT build folders, anh vẫn có Claude + Gemini market. Đây là lý do critical phải support multi-platform sớm.</div>
+      </div>
+    </div>
+    <div class="risk-item">
+      <div class="ri-icon">📜</div>
+      <div>
+        <div class="ri-title">Chrome Web Store reject extension</div>
+        <div class="ri-desc">Google review có thể reject vì broad host permissions. Review process mất 1–3 tuần, có thể bị delay launch.</div>
+        <div class="ri-fix">→ Fix: Chỉ request permissions cần thiết. Viết privacy policy rõ ràng ("data stored locally only"). Submit sớm 2 tuần trước launch date. Nếu bị reject, fix trong 24h và resubmit.</div>
+      </div>
+    </div>
+    <div class="risk-item">
+      <div class="ri-icon">💸</div>
+      <div>
+        <div class="ri-title">Conversion rate thấp hơn 3%</div>
+        <div class="ri-desc">Nếu chỉ 1% users convert, revenue giảm 2/3. Easy Folders ở 1.25%, Superpower ở 10%. Khoảng này phụ thuộc rất nhiều vào product quality và timing của upsell.</div>
+        <div class="ri-fix">→ Fix: A/B test upgrade prompt timing. Show upsell sau khi user có action value rõ ràng (e.g., sau khi tạo folder thứ 3). Email sequence ngay khi free limit hit. Lifetime deal giúp bypass subscription friction.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main-col -->
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <div class="evidence">
+    <div class="ev-label">Verified Proof — 1 Developer</div>
+    <div class="ev-name">Superpower ChatGPT</div>
+    <div class="ev-rev">$20K</div>
+    <div class="ev-period">/ tháng · 200K+ users</div>
+    <div class="ev-desc">Saeed Ezzati build một mình. Bắt đầu free 9 tháng. Revenue từ Pro subscription + newsletter sponsors. $0 paid ads. Mọi tính năng đến từ user feedback trên Reddit.</div>
+  </div>
+
+  <div class="scard">
+    <div class="scard-title">📊 Quick Stats</div>
+    <div class="kpi"><div class="kpi-l">Build time MVP</div><div class="kpi-v kg">4–5 tuần</div></div>
+    <div class="kpi"><div class="kpi-l">Server cost</div><div class="kpi-v kg">$0/tháng</div></div>
+    <div class="kpi"><div class="kpi-l">Profit margin</div><div class="kpi-v kg">90–95%</div></div>
+    <div class="kpi"><div class="kpi-l">1st revenue</div><div class="kpi-v kg">Tháng 1</div></div>
+    <div class="kpi"><div class="kpi-l">Passive từ tháng</div><div class="kpi-v kg">4</div></div>
+    <div class="kpi"><div class="kpi-l">Target Year 1</div><div class="kpi-v kg">$75K–$90K</div></div>
+    <div class="kpi"><div class="kpi-l">Exit potential</div><div class="kpi-v ka">40–60× MRR</div></div>
+  </div>
+
+  <div class="scard">
+    <div class="scard-title">✅ Làm Ngay Tuần Này</div>
+    <ul class="action-items">
+      <li class="ai-item"><div class="ai-num">1</div>Clone boilerplate Jonghakseo, setup manifest với 3 host permissions (ChatGPT, Claude, Gemini)</li>
+      <li class="ai-item"><div class="ai-num">2</div>Inspect DOM của chatgpt.com sidebar — tìm class names của chat list items</li>
+      <li class="ai-item"><div class="ai-num">3</div>Paste Cursor prompt ở section 03 để code agent build FolderTree component đầu tiên</li>
+      <li class="ai-item"><div class="ai-num">4</div>Join r/ChatGPT — đọc top posts "organize" để validate pain points và tìm beta users</li>
+      <li class="ai-item"><div class="ai-num">5</div>Setup Beehiiv newsletter (free) — URL để collect emails sẵn trong extension</li>
+      <li class="ai-item"><div class="ai-num">6</div>Register ExtensionPay account — sẵn sàng charge từ ngày launch</li>
+    </ul>
+  </div>
+
+  <div class="scard" style="background:rgba(245,158,11,.04);border-color:var(--amber-border);">
+    <div class="scard-title" style="color:var(--amber);">⚡ Cách build nhanh nhất với code agent</div>
+    <p style="font-size:12.5px;color:var(--muted);line-height:1.65;margin-bottom:10px;">
+      Dùng Claude Code với CLAUDE.md file mô tả toàn bộ codebase structure. Mỗi feature = 1 task. Cursor's Composer để refactor lớn.
+    </p>
+    <p style="font-size:12.5px;color:var(--muted);line-height:1.65;">
+      <strong style="color:var(--amber);">Rule:</strong> 1 ngày = 1 feature. Commit sau mỗi feature. Test trên Chrome trực tiếp — không có unit test ở giai đoạn MVP.
+    </p>
+  </div>
+
+</div>
+</div><!-- /main-wrap -->
+
+<script>
+function togglePhase(el) {
+  el.closest('.phase-block').classList.toggle('open');
+}
+
+async function copyCode(btn, id) {
+  const code = document.getElementById(id).textContent;
+  try {
+    await navigator.clipboard.writeText(code);
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  } catch(e) { btn.textContent = 'Error'; }
+}
+
+// Nav active state on scroll
+const sections = document.querySelectorAll('.section[id]');
+const navLinks = document.querySelectorAll('.nav-link');
+
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`.nav-link[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+
+sections.forEach(s => obs.observe(s));
+
+// Also handle overview/hero
+const heroObs = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting) {
+    navLinks.forEach(l => l.classList.remove('active'));
+    document.querySelector('.nav-link[href="#overview"]')?.classList.add('active');
+  }
+}, { rootMargin: '0px 0px -80% 0px' });
+const heroEl = document.getElementById('overview');
+if (heroEl) heroObs.observe(heroEl);
+</script>
+</body>
+</html>
