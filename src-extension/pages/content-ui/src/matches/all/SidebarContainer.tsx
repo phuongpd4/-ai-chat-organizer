@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { AppStorage, getStorageData, saveFolders, saveChats, Folder, ChatNode } from '@extension/shared/lib/storage';
 import { useDOMObserver } from '@extension/shared/hooks/useDOMObserver';
 import { getTheme, getSavedTheme, saveTheme, ThemeMode, ThemeColors } from '@extension/shared/lib/theme';
-import { FolderIcon, Plus, MoreVertical, MessageSquare, Pencil, Trash2, ChevronDown, ChevronRight, FolderInput, X, Sun, Moon, Pin, Bookmark } from 'lucide-react';
+import { FolderIcon, Plus, MoreVertical, MessageSquare, Pencil, Trash2, ChevronDown, ChevronRight, FolderInput, X, Sun, Moon, Pin, Bookmark, Download } from 'lucide-react';
 import SearchBar from './SearchBar';
 
 export default function SidebarContainer() {
@@ -94,6 +94,56 @@ export default function SidebarContainer() {
         const updatedBookmarks = appState.bookmarks.filter(b => b.id !== bookmarkId);
         setAppState({ ...appState, bookmarks: updatedBookmarks });
         chrome.storage.sync.set({ bookmarks: updatedBookmarks });
+    };
+
+    const handleExportFolder = (folderId: string, format: 'json' | 'md') => {
+        if (!appState) return;
+        const folder = appState.folders.find(f => f.id === folderId);
+        if (!folder) return;
+
+        // Lấy tất cả các đoạn chat nằm trong folder này (chỉ level 1 trong MVP)
+        const chatsToExport = allChats.filter(c => c.folderId === folderId);
+
+        let content = '';
+        let filename = `${folder.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_export`;
+        let mimeType = 'text/plain';
+
+        if (format === 'json') {
+            const exportData = {
+                folder: folder.name,
+                exportedAt: new Date().toISOString(),
+                chats: chatsToExport.map(c => ({
+                    title: c.title,
+                    url: c.url,
+                    platform: c.platform,
+                    createdAt: new Date(c.createdAt).toISOString()
+                }))
+            };
+            content = JSON.stringify(exportData, null, 2);
+            filename += '.json';
+            mimeType = 'application/json';
+        } else if (format === 'md') {
+            content += `# Folder: ${folder.name}\n\n`;
+            content += `*Exported at: ${new Date().toLocaleString('en-GB')}*\n\n`;
+            content += `## Chats (${chatsToExport.length})\n\n`;
+            chatsToExport.forEach(c => {
+                content += `- **[${c.platform}]** [${c.title}](${c.url}) - *Created: ${new Date(c.createdAt).toLocaleString('en-GB')}*\n`;
+            });
+            filename += '.md';
+            mimeType = 'text/markdown';
+        }
+
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        setFolderMenuId(null);
     };
 
     const toggleFolderExpand = (folderId: string) => {
@@ -278,6 +328,14 @@ export default function SidebarContainer() {
                                 style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.text, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}
                                 onMouseEnter={e => (e.currentTarget.style.background = t.dropdownHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                             ><Pencil size={12} /> Rename</button>
+                            <button onClick={() => handleExportFolder(folder.id, 'md')}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.text, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = t.dropdownHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            ><Download size={12} /> Export MD</button>
+                            <button onClick={() => handleExportFolder(folder.id, 'json')}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.text, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = t.dropdownHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            ><Download size={12} /> Export JSON</button>
                             <button onClick={() => handleDeleteFolder(folder.id)}
                                 style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '6px 8px', background: 'none', border: 'none', color: t.danger, cursor: 'pointer', borderRadius: '4px', fontSize: '12px', textAlign: 'left' }}
                                 onMouseEnter={e => (e.currentTarget.style.background = t.dropdownHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

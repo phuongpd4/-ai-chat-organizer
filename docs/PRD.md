@@ -31,8 +31,9 @@
 
 ### Phase 2: Tính năng Pro (Bắt đầu Monetization)
 *Mục tiêu: Upsell cho người dùng Free với giá $5.99/tháng.*
-- **AI Auto-Tagging**: Phân tích và tự động gắn thẻ ngữ nghĩa cho các cuộc trò chuyện.
+
 - **Export Hub**: Xuất hàng loạt hội thoại (Bulk export) ra định dạng Markdown, PDF, hoặc đồng bộ trực tiếp lên Notion API.
+- **Manual Tagging (Gắn thẻ thủ công)**: Cho phép người dùng gán N nhãn (Tags) tùy chỉnh cho một đoạn chat cụ thể (Ví dụ: `#idea`, `#coding`). Hỗ trợ lọc tìm kiếm chéo thông qua thanh Search Bar.
 - **Hỗ trợ Gemini**: Chèn sidebar quản lý vào trang `gemini.google.com`.
 - **Usage Dashboard (Thống kê)**: Hiển thị biểu đồ sử dụng AI, thời gian online, topic chat nhiều nhất, ...
 
