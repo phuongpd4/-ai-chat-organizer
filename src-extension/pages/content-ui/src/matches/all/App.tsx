@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import SidebarContainer from './SidebarContainer';
+import { useMessageObserver } from '@extension/shared/hooks/useMessageObserver';
 
 export default function App() {
+  useMessageObserver();
+
   const [isOpen, setIsOpen] = useState(false);
   const [isEnabled, setIsEnabled] = useState(true);
 

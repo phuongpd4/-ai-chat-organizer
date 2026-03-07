@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { AppStorage, getStorageData, saveFolders, saveChats, Folder, ChatNode } from '@extension/shared/lib/storage';
 import { useDOMObserver } from '@extension/shared/hooks/useDOMObserver';
 import { getTheme, getSavedTheme, saveTheme, ThemeMode, ThemeColors } from '@extension/shared/lib/theme';
-import { FolderIcon, Plus, MoreVertical, MessageSquare, Pencil, Trash2, ChevronDown, ChevronRight, FolderInput, X, Sun, Moon, Pin } from 'lucide-react';
+import { FolderIcon, Plus, MoreVertical, MessageSquare, Pencil, Trash2, ChevronDown, ChevronRight, FolderInput, X, Sun, Moon, Pin, Bookmark } from 'lucide-react';
 import SearchBar from './SearchBar';
 
 export default function SidebarContainer() {
@@ -10,7 +10,7 @@ export default function SidebarContainer() {
     const [searchResults, setSearchResults] = useState<ChatNode[] | null>(null);
     const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
-    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['system_bookmarks'])); // Mặc định mở Bookmarks
     const [assigningChatId, setAssigningChatId] = useState<string | null>(null);
     const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
     const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
@@ -25,8 +25,19 @@ export default function SidebarContainer() {
         getSavedTheme().then(setThemeMode);
 
         const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
-            if (areaName === 'sync' && changes.themeMode) {
-                setThemeMode(changes.themeMode.newValue === 'light' ? 'light' : 'dark');
+            if (areaName === 'sync') {
+                if (changes.themeMode) {
+                    setThemeMode(changes.themeMode.newValue === 'light' ? 'light' : 'dark');
+                }
+                if (changes.bookmarks) {
+                    setAppState(prev => prev ? { ...prev, bookmarks: changes.bookmarks.newValue || [] } : null);
+                }
+                if (changes.folders) {
+                    setAppState(prev => prev ? { ...prev, folders: changes.folders.newValue || [] } : null);
+                }
+                if (changes.chats) {
+                    setAppState(prev => prev ? { ...prev, chats: changes.chats.newValue || [] } : null);
+                }
             }
         };
         chrome.storage.onChanged.addListener(listener);
@@ -76,6 +87,13 @@ export default function SidebarContainer() {
         saveFolders(updatedFolders);
         saveChats(updatedChats);
         setFolderMenuId(null);
+    };
+
+    const handleDeleteBookmark = (bookmarkId: string) => {
+        if (!appState) return;
+        const updatedBookmarks = appState.bookmarks.filter(b => b.id !== bookmarkId);
+        setAppState({ ...appState, bookmarks: updatedBookmarks });
+        chrome.storage.sync.set({ bookmarks: updatedBookmarks });
     };
 
     const toggleFolderExpand = (folderId: string) => {
@@ -149,22 +167,25 @@ export default function SidebarContainer() {
         return new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
     };
 
-    if (!appState) return null;
-
-    const platform = (() => {
+    const platform = useMemo(() => {
         const h = window.location.hostname;
         if (h.includes('chatgpt.com')) return 'chatgpt' as const;
         if (h.includes('claude.ai')) return 'claude' as const;
         if (h.includes('gemini.google.com')) return 'gemini' as const;
         return 'chatgpt' as const;
-    })();
+    }, []);
 
-    const allChats: ChatNode[] = nativeChats
-        .filter(c => { const x = c.title.toLowerCase().trim(); return x.length > 2 && x !== 'new chat' && x !== 'untitled' && x !== 'untitled chat'; })
-        .map(c => {
-            const s = appState.chats.find(sc => sc.id === c.id);
-            return { id: c.id, title: c.title, url: c.href, platform, folderId: s?.folderId, isPinned: s?.isPinned || false, createdAt: s?.createdAt || Date.now() };
-        });
+    const allChats: ChatNode[] = useMemo(() => {
+        if (!appState) return [];
+        return nativeChats
+            .filter(c => { const x = c.title.toLowerCase().trim(); return x.length > 2 && x !== 'new chat' && x !== 'untitled' && x !== 'untitled chat'; })
+            .map(c => {
+                const s = appState.chats.find(sc => sc.id === c.id);
+                return { id: c.id, title: c.title, url: c.href, platform, folderId: s?.folderId, isPinned: s?.isPinned || false, createdAt: s?.createdAt || Date.now() };
+            });
+    }, [nativeChats, appState?.chats, platform]);
+
+    if (!appState) return null;
 
     const chatsInFolders = new Map<string, ChatNode[]>();
     const unassignedChats: ChatNode[] = [];
@@ -343,6 +364,54 @@ export default function SidebarContainer() {
                             <div style={{ fontSize: '12px', color: t.textMuted, padding: '8px', textAlign: 'center', border: `1px dashed ${t.border}`, borderRadius: '6px' }}>Click + to create folder</div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                {/* System Folder: Bookmarks */}
+                                <div key="system_bookmarks">
+                                    <div
+                                        onClick={() => toggleFolderExpand('system_bookmarks')}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '6px', padding: '6px 8px', cursor: 'pointer', position: 'relative', transition: 'all 0.15s',
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = t.bgHover}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                    >
+                                        <span style={{ display: 'flex', color: t.textMuted, width: 14, justifyContent: 'center' }}>
+                                            {(expandedFolders.has('system_bookmarks') || (appState.bookmarks?.length > 0)) ? (expandedFolders.has('system_bookmarks') ? <ChevronDown size={12} /> : <ChevronRight size={12} />) : null}
+                                        </span>
+                                        <Bookmark size={14} style={{ color: '#10b981', flexShrink: 0 }} />
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                                            <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: t.text, fontWeight: 500 }}>Saved Bookmarks</span>
+                                        </div>
+
+                                        {appState.bookmarks?.length > 0 && (<span style={{ fontSize: '10px', color: t.textMuted, background: t.badge, borderRadius: '8px', padding: '0 5px' }}>{appState.bookmarks.length}</span>)}
+                                    </div>
+
+                                    {expandedFolders.has('system_bookmarks') && (
+                                        <div style={{ marginLeft: '12px', borderLeft: `1px solid ${t.border}`, paddingLeft: '8px' }}>
+                                            {(!appState.bookmarks || appState.bookmarks.length === 0) ? (
+                                                <div style={{ fontSize: '11px', color: t.textMuted, padding: '12px 8px', textAlign: 'center', border: `1px dashed ${t.border}`, margin: '4px 0', borderRadius: '4px' }}>
+                                                    Click 'Save' on any AI message
+                                                </div>
+                                            ) : appState.bookmarks.map(bm => (
+                                                <div key={bm.id}
+                                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '4px', padding: '4px 6px', transition: 'background 0.15s', position: 'relative' }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background = t.bgHover; (e.currentTarget.lastChild as HTMLElement).style.opacity = '1'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; (e.currentTarget.lastChild as HTMLElement).style.opacity = '0'; }}
+                                                >
+                                                    <a href={bm.url} style={{ display: 'flex', flexDirection: 'column', flex: 1, textDecoration: 'none', color: t.text, overflow: 'hidden' }}>
+                                                        <span style={{ fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', fontStyle: 'italic', color: t.textSecondary, lineHeight: '1.4' }}>"{bm.textExcerpt}"</span>
+                                                        <span style={{ fontSize: '9px', color: t.textMuted, marginTop: '2px' }}>{formatDate(bm.createdAt)}</span>
+                                                    </a>
+                                                    {/* Delete Bookmark Button */}
+                                                    <button onClick={e => { e.preventDefault(); e.stopPropagation(); handleDeleteBookmark(bm.id); }} title="Delete bookmark"
+                                                        style={{ background: 'none', border: 'none', color: t.danger, cursor: 'pointer', padding: '4px', display: 'flex', opacity: 0, transition: 'opacity 0.2s', flexShrink: 0 }}
+                                                    ><Trash2 size={12} /></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Only render top-level folders */}
                                 {appState.folders.filter(f => !f.parentId).map(folder => renderFolderNode(folder, 0))}
                             </div>

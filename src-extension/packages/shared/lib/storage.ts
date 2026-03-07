@@ -19,16 +19,27 @@ export interface ChatNode {
     folderId?: string; // Nếu thuộc về folder
     isPinned: boolean;
     createdAt: number;
+    highlightIndices?: readonly [number, number][]; // Lưu vị trí từ khóa tìm kiếm
+}
+
+export interface BookmarkNode {
+    id: string;
+    chatId: string;
+    textExcerpt: string;
+    url: string;
+    createdAt: number;
 }
 
 export interface AppStorage {
     folders: Folder[];
     chats: ChatNode[];
+    bookmarks: BookmarkNode[];
 }
 
 const DEFAULT_STATE: AppStorage = {
     folders: [],
-    chats: []
+    chats: [],
+    bookmarks: []
 };
 
 /**
@@ -37,7 +48,7 @@ const DEFAULT_STATE: AppStorage = {
 export async function getStorageData(): Promise<AppStorage> {
     return new Promise((resolve) => {
         try {
-            chrome.storage.sync.get(['folders', 'chats'], (result) => {
+            chrome.storage.sync.get(['folders', 'chats', 'bookmarks'], (result) => {
                 if (chrome.runtime.lastError) {
                     console.warn('[AI Chat Org] Storage Get Error:', chrome.runtime.lastError);
                     resolve(DEFAULT_STATE);
@@ -45,7 +56,8 @@ export async function getStorageData(): Promise<AppStorage> {
                 }
                 resolve({
                     folders: result?.folders || DEFAULT_STATE.folders,
-                    chats: result?.chats || DEFAULT_STATE.chats
+                    chats: result?.chats || DEFAULT_STATE.chats,
+                    bookmarks: result?.bookmarks || DEFAULT_STATE.bookmarks
                 });
             });
         } catch (e) {
@@ -83,6 +95,25 @@ export async function saveChats(chats: ChatNode[]): Promise<void> {
             chrome.storage.sync.set({ chats }, () => {
                 if (chrome.runtime.lastError) {
                     console.warn('[AI Chat Org] Storage Set Chats Error:', chrome.runtime.lastError);
+                }
+                resolve();
+            });
+        } catch (e) {
+            console.warn('[AI Chat Org] Extension context invalidated:', e);
+            resolve();
+        }
+    });
+}
+
+/**
+ * Ghi đè toàn bộ dữ liệu bookmark
+ */
+export async function saveBookmarks(bookmarks: BookmarkNode[]): Promise<void> {
+    return new Promise((resolve) => {
+        try {
+            chrome.storage.sync.set({ bookmarks }, () => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[AI Chat Org] Storage Set Bookmarks Error:', chrome.runtime.lastError);
                 }
                 resolve();
             });
